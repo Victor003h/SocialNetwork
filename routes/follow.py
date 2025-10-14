@@ -33,3 +33,35 @@ def unfollow_user(user_id):
     db.session.delete(f)
     db.session.commit()
     return jsonify({"msg": "Unfollowed user"})
+
+@follow_bp.route("/followers", methods=["GET"])
+@jwt_required()
+def get_followers():
+    current_user = get_jwt_identity()
+    followers = (
+        db.session.query(User)
+        .join(Follow, Follow.follower_id == User.id)
+        .filter(Follow.followed_id == current_user)
+        .all()
+    )
+
+    return jsonify({
+        "user_id": current_user,
+        "followers": [{"id": u.id, "username": u.username} for u in followers]
+    }), 200
+
+@follow_bp.route("/following", methods=["GET"])
+@jwt_required()
+def get_following():
+    current_user = get_jwt_identity()
+    following = (
+        db.session.query(User)
+        .join(Follow, Follow.followed_id == User.id)
+        .filter(Follow.follower_id == current_user)
+        .all()
+    )
+
+    return jsonify({
+        "user_id": current_user,
+        "following": [{"id": u.id, "username": u.username} for u in following]
+    }), 200
