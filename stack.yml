@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  web:
+    image: socialnetwork_web:latest
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_APP: app.py
+      FLASK_ENV: production
+      DATABASE_URL: postgresql://admin:secret@db:5432/redsocial
+      JWT_SECRET_KEY: supersecretkey
+    depends_on:
+      - db
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+    networks:
+      - socialnet
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: redsocial
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - socialnet
+
+volumes:
+  pgdata:
+
+networks:
+  socialnet:
+    driver: overlay
