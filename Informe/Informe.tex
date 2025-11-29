@@ -1,0 +1,180 @@
+\documentclass[12pt]{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{%
+\textbf{Diseño y Construcción de una Red Social Distribuida}\
+\large Aplicación de los Conceptos de Sistemas Distribuidos Estudiados en Clase
+}
+
+\author{Victor Pacheco \ Jose Agustín Del Toro González}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este informe describe el diseño, análisis y justificación teórica del proyecto ``Red Social Distribuida''. Se presenta la arquitectura final basada en microservicios, las decisiones de diseño distribuidas, y cómo cada componente del sistema aplica directamente los conceptos estudiados en las conferencias: arquitecturas, procesos, comunicación, coordinación, consistencia, replicación, tolerancia a fallos, cache, privacidad y escalabilidad geográfica.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%--------------------------------------------------------------
+\section{Introducción}
+
+El presente proyecto consiste en diseñar e implementar una \textbf{red social distribuida} capaz de soportar usuarios, posts, relaciones (follow/unfollow), autenticación distribuida.
+
+El objetivo de este informe es demostrar \textbf{cómo cada concepto estudiado en el curso se aplica directamente en el diseño del proyecto}.
+
+%--------------------------------------------------------------
+\section{Arquitectura Distribuida del Sistema}
+
+\subsection{Microservicios}
+La arquitectura escogida es una \textbf{arquitectura orientada a servicios (SOA)} basada en microservicios, 
+
+Los servicios definidos son:
+
+\begin{itemize}
+\item \textbf{Auth-Service}: manejo de autenticación distribuida y emisión de tokens JWT.
+\item \textbf{User-Service}: gestión de perfiles y privacidad.
+\item \textbf{Relation-Service}: implementación del grafo distribuido de seguidores.
+\item \textbf{Post-Service}: creación y consulta de publicaciones.
+\item \textbf{Feed-Service}: generación del feed mediante mensajes asincrónicos.
+\item \textbf{API-Gateway}: punto único de entrada que resuelve el nombrado y direccionamiento.
+\end{itemize}
+
+
+\subsection{Sharding}
+El sistema distribuye usuarios, posts y relaciones entre múltiples bases de datos mediante particionamiento horizontal por rango o hash. Este mecanismo:
+\begin{itemize}
+\item Reduce la carga.
+\item Permite escalabilidad independiente.
+\item Evita un único punto de fallo.
+\end{itemize}
+
+%--------------------------------------------------------------
+\section{Procesos y Modelo de Ejecución}
+
+Cada microservicio corre como un \textbf{proceso independiente}.
+
+Además, el Feed-Service utiliza múltiples workers que actúan como \textbf{procesos concurrentes} que reciben mensajes desde RabbitMQ, siguiendo el paradigma de \textit{message passing}.
+
+%--------------------------------------------------------------
+\section{Comunicación Distribuida}
+
+Se aplican los siguientes modelos:
+
+\subsection{Comunicación Sincrónica: HTTP/REST}
+La comunicación directa entre microservicios (ej., User-Service → Relation-Service) ocurre mediante solicitudes HTTP:
+\begin{itemize}
+\item No persistente.
+\item Sincrónica.
+\item Transparente.
+\end{itemize}
+
+Corresponde a un modelo RPC simplificado.
+
+\subsection{Comunicación Asincrónica Persistente: RabbitMQ}
+La creación de posts se comunica al Feed-Service mediante un \textbf{broker de mensajes}. Esto aplica:
+\begin{itemize}
+\item Mensajería persistente.
+\item Desacoplamiento temporal.
+\item Resiliencia ante fallos.
+\end{itemize}
+
+Este mecanismo implementa completamente la teoría de \textit{Message-Oriented Middleware}.
+
+%--------------------------------------------------------------
+\section{Nombrado y Direccionamiento}
+
+La arquitectura utiliza:
+
+\begin{itemize}
+\item \textbf{Nombrado estructurado}: el API-Gateway actúa como un DNS interno.
+\item \textbf{Nombrado plano distribuido}: el sharding basado en hash distribuye entidades sin jerarquía.
+\item \textbf{Descubrimiento de servicios}: cada servicio se registra mediante rutas lógicas.
+\end{itemize}
+
+%--------------------------------------------------------------
+\section{Coordinación y Consenso}
+
+El sistema implementa coordinación mediante:
+
+\subsection{Elección de Líder}
+Cada shard puede poseer múltiples réplicas. Se implementa una elección de líder estilo Bully/Raft simplificado:
+\begin{itemize}
+\item La réplica con mayor prioridad actúa como líder.
+\item Si el líder falla, las réplicas realizan una elección.
+\end{itemize}
+
+\subsection{Coordinación entre Réplicas}
+El líder recibe escrituras, las propaga a las réplicas y garantiza orden.
+
+%--------------------------------------------------------------
+\section{Consistencia}
+
+El sistema aplica múltiples modelos de consistencia según el contexto:
+
+\begin{itemize}
+\item \textbf{Consistencia eventual}: el feed se actualiza de forma asíncrona.
+\item \textbf{Consistencia causal}: si A sigue a B y luego B publica, A debe ver esa publicación.
+\item \textbf{Lecturas monótonas}: cada usuario siempre ve su propio feed de forma creciente.
+\item \textbf{Lee tus escrituras}: los cambios de perfil son visibles inmediatamente al propio usuario.
+\end{itemize}
+
+%--------------------------------------------------------------
+\section{Tolerancia a Fallos}
+
+Se aplican directamente los conceptos de \textit{Tolerancia a Fallos}:
+
+\subsection{Redundancia Física}
+Cada shard posee múltiples réplicas.
+
+\subsection{Redundancia de Información}
+RabbitMQ almacena los mensajes en disco hasta que los consumidores los procesan.
+
+\subsection{Mecanismos de Recuperación}
+\begin{itemize}
+\item Recuperación de réplicas mediante sincronización con la copia primaria.
+\item Offset de mensajes para evitar reprocesamiento.
+\end{itemize}
+
+\subsection{Disponibilidad y Confiabilidad}
+El uso de microservicios evita fallos globales.
+
+%--------------------------------------------------------------
+\section{Cache Distribuida}
+
+Redis proporciona:
+\begin{itemize}
+\item Cache por región geográfica.
+\item Reducción de latencia en el Feed-Service.
+\item Vistas consistentes mediante expiración controlada.
+\end{itemize}
+
+ 
+%--------------------------------------------------------------
+\section{Privacidad Distribuida}
+
+El User-Service controla políticas de privacidad, y el Feed-Service verifica permisos antes de servir el contenido. Esto se logra mediante:
+\begin{itemize}
+\item JWT para identidad distribuida.
+\item Control de acceso descentralizado.
+\item Consistencia fuerte para reglas de privacidad.
+\end{itemize}
+
+%--------------------------------------------------------------
+\section{Conclusión}
+
+El proyecto implementa una arquitectura distribuida completamente alineada con los conceptos teóricos estudiados en el curso. Cada decisión —arquitectura, comunicación, consistencia, coordinación, tolerancia a fallos y privacidad— se fundamenta en principios formales de sistemas distribuidos. El resultado es una red social escalable, resiliente, segura y distribuida.
+
+\end{document}

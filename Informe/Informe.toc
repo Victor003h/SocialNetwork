@@ -1,0 +1,22 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Introducción}{3}{section.1}%
+\contentsline {section}{\numberline {2}Arquitectura Distribuida del Sistema}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Microservicios}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Sharding}{3}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Procesos y Modelo de Ejecución}{3}{section.3}%
+\contentsline {section}{\numberline {4}Comunicación Distribuida}{3}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Comunicación Sincrónica: HTTP/REST}{4}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Comunicación Asincrónica Persistente: RabbitMQ}{4}{subsection.4.2}%
+\contentsline {section}{\numberline {5}Nombrado y Direccionamiento}{4}{section.5}%
+\contentsline {section}{\numberline {6}Coordinación y Consenso}{4}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Elección de Líder}{4}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Coordinación entre Réplicas}{5}{subsection.6.2}%
+\contentsline {section}{\numberline {7}Consistencia}{5}{section.7}%
+\contentsline {section}{\numberline {8}Tolerancia a Fallos}{5}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Redundancia Física}{5}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Redundancia de Información}{5}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Mecanismos de Recuperación}{5}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Disponibilidad y Confiabilidad}{5}{subsection.8.4}%
+\contentsline {section}{\numberline {9}Cache Distribuida}{5}{section.9}%
+\contentsline {section}{\numberline {10}Privacidad Distribuida}{6}{section.10}%
+\contentsline {section}{\numberline {11}Conclusión}{6}{section.11}%
