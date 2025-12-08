@@ -1,0 +1,160 @@
+\documentclass[12pt]{article}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2cm}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Sistemas Distribuidos 2025}
+\lhead{Informe Técnico}
+\rfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+\title{%
+	\vspace{1cm}
+	\Huge \textbf{Informe del Sistema Distribuido}\\[6pt]
+	\Large \textbf{Diseño e Implementación de una Red Social Distribuida}\\[12pt]
+}
+\author{\textit{Victor Hugo Pacheco Fonseca C411}\\
+\textit{Jose Agustin del Toro C412}\\
+	Asignatura: Sistemas Distribuidos}
+\date{2025}
+
+\begin{document}
+	
+	\maketitle
+	\tableofcontents
+	\newpage
+	
+	%------------------------------------------------------------
+\section{Introducción}
+
+El presente informe describe el diseño e implementación de una red social construida bajo una arquitectura de microservicios. El objetivo principal es aplicar los conceptos fundamentales de los sistemas distribuidos, tales como particionamiento de datos, comunicación entre procesos, consistencia, replicación y demas
+
+La aplicación se divide en múltiples servicios independientes que cooperan mediante comunicación interna HTTP, mientras que el cliente interactúa únicamente con un API Gateway que unifica y abstrae la infraestructura. Cada servicio gestiona su propia base de datos o fragmento (\textit{shard}), lo que permite distribuir la carga, mejorar la disponibilidad
+
+
+
+	\section{Arquitectura General del Sistema}
+	
+	La arquictectura esta basada en microservicios
+	
+	\subsection{Microservicios}
+	El sistema se divide en los siguientes servicios independientes:
+	\begin{itemize}
+		\item \textbf{API Gateway}: punto de entrada único para el cliente.
+		\item \textbf{Auth Service}: autenticación y firma/verificación de tokens JWT.
+		\item \textbf{User Service}: administración de perfiles de usuarios.
+		\item \textbf{Relation Service}: mantenimiento del grafo de seguidores.
+		\item \textbf{Post Service}: almacenamiento distribuido de publicaciones.
+
+	\end{itemize}
+
+	\section{Comunicación}
+	
+	\subsection{Comunicación Cliente → Servidor}
+	El cliente interactúa únicamente con el \textbf{API Gateway}, que actúa como intermediario y responsable de:
+	\begin{itemize}
+		\item Redirigir solicitudes a los microservicios correctos.
+		\item Validar tokens JWT.
+		\item Simplificar la visibilidad de la arquitectura interna.
+	\end{itemize}
+	
+	Las comunicaciones se realizan mediante peticiones HTTP utilizando JSON como formato de transporte. El cliente nunca accede directamente a los microservicios.
+	
+	\subsection{Comunicación entre Servidores}
+La comunicación entre microservicios se realiza mediante \textbf{HTTP interno} dentro de la red del despliegue. Cada servicio expone endpoints internos que permiten:
+	\begin{itemize}
+		\item Consultar información alojada en otro servicio (p.~ej., obtener seguidores).
+		\item Notificar eventos relevantes, como una nueva publicación.
+		\item Propagar cambios para mantener consistencia eventual.
+	\end{itemize}
+	
+	Este enfoque mantiene independencia entre los servicios, respetando el estilo distribuido, sin necesidad de colas de mensajes o brokers.
+	
+	%------------------------------------------------------------
+	\section{Organización Interna del Sistema Distribuido}
+	
+	\subsection{Procesos}
+	\begin{itemize}
+
+		\item \textbf{Instancias replicadas}: cada servicio se puede duplicar para tolerancia a fallos.
+	\end{itemize}
+	
+	\subsection{Agrupación de Procesos}
+	Cada microservicio se ejecuta en un contenedor autónomo, permitiendo:
+	\begin{itemize}
+		\item despliegue individual;
+		\item fallos parciales sin impacto global;
+		\item escalado independiente.
+	\end{itemize}
+	
+
+	\section{Consistencia y Replicación}
+	
+	\subsection{Consistencia}
+	El sistema implementa una combinación de:
+	\begin{itemize}
+		\item  \textbf{Consistencia eventual global}: los microservicios intercambian información por HTTP, por lo que el estado del sistema converge con el tiempo.
+	\end{itemize}
+	
+	\subsection{Replicación}
+	Cada shard puede replicarse en múltiples nodos para:
+	\begin{itemize}
+		\item mejorar disponibilidad;
+		\item prevenir pérdida de datos;
+
+	\end{itemize}
+	
+	La replicación sigue un modelo \textbf{primario–réplica}, donde el nodo principal acepta escrituras y las réplicas absorben lecturas.
+	
+	%------------------------------------------------------------
+\section{Nombrado y Localización}
+
+
+\subsection{Nombrado}
+Cada servicio es nombrado dentro del DNS interno de Docker 
+
+\subsection{Localización}
+La localización se resuelve mediante dos mecanismos complementarios:
+
+\begin{itemize}
+	
+	\item \textbf{API Gateway}: actúa como punto de acceso único para el cliente y como sistema de localización indirecta. El cliente solo conoce al Gateway, y este reenvía cada solicitud al microservicio correspondiente según su nombre.
+	
+	\item \textbf{DNS interno de Docker}:
+\end{itemize}
+
+
+	%------------------------------------------------------------
+	\section{Tolerancia a Fallos}
+	\begin{itemize}
+		\item El sistema permite que un servicio falle sin provocar la caída global.
+		\item La replicación reduce la probabilidad de pérdida de información.
+		\item La comunicación entre servicios se reintenta automáticamente si un nodo está temporalmente inaccesible.
+	\end{itemize}
+	
+	%------------------------------------------------------------
+	\section{Conclusiones}
+	
+	El sistema diseñado cumple con los principios fundamentales del Teorema CAP, que establece que un sistema distribuido no puede garantizar simultáneamente consistencia, disponibilidad y tolerancia a particiones.
+	
+	En este caso:
+	\begin{itemize}
+		\item Se prioriza la \textbf{Disponibilidad} mediante microservicios independientes y replicados.
+		\item Se prioriza la \textbf{Tolerancia a Particiones} usando comunicación interna por HTTP, que permite que los servicios continúen operando incluso ante fallos parciales.
+		\item Se alcanza \textbf{Consistencia Eventual}, dado que las actualizaciones se propagan entre microservicios con un retraso inherente.
+	\end{itemize}
+	
+	Por tanto, el proyecto implementa un sistema distribuido clasificado como \textbf{AP} según CAP: prioriza disponibilidad y tolerancia a fallos, sacrificando consistencia inmediata, lo cual es apropiado y común en sistemas sociales modernos.
+	
+	El resultado es una arquitectura robusta, extensible y coherente con los objetivos de la asignatura de Sistemas Distribuidos.
+	
+\end{document}

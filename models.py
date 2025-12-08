@@ -17,6 +17,7 @@ class User(db.Model):
             "created_at": self.created_at.isoformat()
         }
 
+
 class Message(db.Model):
     __tablename__ = "messages"
 
