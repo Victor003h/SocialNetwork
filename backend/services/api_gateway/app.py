@@ -1,104 +1,92 @@
 from flask import Flask, request, jsonify
 import requests
-import jwt
 import os
+import jwt
 
 app = Flask(__name__)
 
-# Clave para verificar JWT (misma que en Auth Service )
-JWT_SECRET = os.getenv("JWT_SECRET_KEY", "supersecretkey")
+# URLs internas de los servicios
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:5001")
+USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:5002")
+POST_SERVICE_URL = os.getenv("POST_SERVICE_URL", "http://localhost:5003")
 
-# ---------------------------
-# Helper para reenviar requests
-# ---------------------------
-def forward_request(service_url):
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecretkey")
+
+# ---------- Utils ----------
+def validate_token(token):
     try:
-        if request.method == "GET":
-            response = requests.get(service_url, params=request.args)
-        elif request.method == "POST":
-            response = requests.post(service_url, json=request.get_json())
-        elif request.method == "PUT":
-            response = requests.put(service_url, json=request.get_json())
-        elif request.method == "DELETE":
-            response = requests.delete(service_url, json=request.get_json())
-        else:
-            return jsonify({"error": "Método no soportado"}), 405
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+        return payload
+    except jwt.InvalidTokenError:
+        return None
 
-        return jsonify(response.json()), response.status_code
+# ---------- Auth ----------
+@app.route("/auth/<path:path>", methods=["POST"])
+def auth_proxy(path):
+    try:
+        print(f"{AUTH_SERVICE_URL}/{path}")
+        resp = requests.post(
+            f"{AUTH_SERVICE_URL}/{path}",
+            json=request.get_json(),
+            timeout=3
+        )
+        return jsonify(resp.json()), resp.status_code
+    except requests.RequestException:
+        return jsonify({"error": "Auth service unavailable"}), 503
 
-    except requests.exceptions.ConnectionError:
-        return jsonify({"error": "Servicio no disponible"}), 503
+# ---------- Protected routes ----------
+@app.before_request
+def check_auth():
+    print(request.path)
+    
+    if request.path.startswith("/auth"):
+        return
 
-
-@app.route("/auth/<path:subpath>", methods=["POST"])
-def route_auth(subpath):
-    url = f"http://auth-service:5001/{subpath}"
-    return forward_request(url)
-
-
-# ---------------------------
-# Middleware de validación JWT
-# ---------------------------
-def require_jwt():
     token = request.headers.get("Authorization")
     if not token:
-        return None, jsonify({"error": "Falta token"}), 401
+        return jsonify({"error": "Missing token"}), 401
 
+    token = token.replace("Bearer ", "")
+    payload = validate_token(token)
+    if not payload:
+        return jsonify({"error": "Invalid token"}), 401
+
+    request.user = payload
+
+# ---------- Users ----------
+@app.route("/users/<path:path>", methods=["GET", "POST"])
+def users_proxy(path):
     try:
-        decoded = jwt.decode(token.replace("Bearer ", ""), JWT_SECRET, algorithms=["HS256"])
-        return decoded, None, None
-    except jwt.exceptions.InvalidTokenError:
-        return None, jsonify({"error": "Token inválido"}), 401
+        resp = requests.request(
+            method=request.method,
+            url=f"{USER_SERVICE_URL}/{path}",
+            headers=request.headers,
+            json=request.get_json(),
+            timeout=3
+        )
+        return jsonify(resp.json()), resp.status_code
+    except requests.RequestException:
+        return jsonify({"error": "User service unavailable"}), 503
+
+# ---------- Posts ----------
+@app.route("/posts/<path:path>", methods=["GET", "POST"])
+def posts_proxy(path):
+    try:
+        resp = requests.request(
+            method=request.method,
+            url=f"{POST_SERVICE_URL}/{path}",
+            headers=request.headers,
+            json=request.get_json(),
+            timeout=3
+        )
+        return jsonify(resp.json()), resp.status_code
+    except requests.RequestException:
+        return jsonify({"error": "Post service unavailable"}), 503
 
 
-# ---------------------------
-# Rutas protegidas por servicio
-# ---------------------------
-
-@app.route("/users/<path:subpath>", methods=["GET", "POST", "PUT"])
-def route_users(subpath):
-    _, err, code = require_jwt()
-    if err:
-        return err, code
-
-    url = f"http://user-service:5002/{subpath}"
-    return forward_request(url)
-
-
-@app.route("/relations/<path:subpath>", methods=["GET", "POST"])
-def route_relations(subpath):
-    _, err, code = require_jwt()
-    if err:
-        return err, code
-
-    url = f"http://relation-service:5003/{subpath}"
-    return forward_request(url)
-
-
-@app.route("/posts/<path:subpath>", methods=["GET", "POST", "PUT"])
-def route_posts(subpath):
-    _, err, code = require_jwt()
-    if err:
-        return err, code
-
-    url = f"http://post-service:5004/{subpath}"
-    return forward_request(url)
-
-
-@app.route("/feed/<path:subpath>", methods=["GET"])
-def route_feed(subpath):
-    _, err, code = require_jwt()
-    if err:
-        return err, code
-
-    url = f"http://feed-service:5005/{subpath}"
-    return forward_request(url)
-
-
-# ---------------------------
 @app.route("/")
 def index():
-    return {"msg": "API Gateway activo"}
+    return {"msg": "API Gateway running"}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

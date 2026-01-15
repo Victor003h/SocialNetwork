@@ -1,12 +1,8 @@
 import os
 
-from flask_sqlalchemy import SQLAlchemy
-
 
 DB_USER = os.getenv("POSTGRES_USER", "admin")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "secret")
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("POSTGRES_DB", "auth_db")
-DB_PORT= os.getenv("DB_PORT","5433")
+DB_NAME = os.getenv("POSTGRES_DB", "post_db")
 
-db = SQLAlchemy()

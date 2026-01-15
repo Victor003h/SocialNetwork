@@ -1,27 +1,35 @@
 from flask import Flask,request,jsonify
-from model import User, db
+from model import User
+from db_config import db,DB_HOST,DB_NAME,DB_PASSWORD,DB_PORT,DB_USER
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 import datetime
 import jwt
 import os
 
+
 app = Flask(__name__)
 
 
 
-app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db.DB_USER}:{db.DB_PASSWORD}@{db.DB_HOST}:5432/{db.DB_NAME}"
+app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5433/{DB_NAME}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db = SQLAlchemy(app)
+db.init_app(app)
 bcrypt = Bcrypt(app)
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "supersecretkey")
 
 
+@app.route("/check",methods=["GET"])
+def check():
+    return jsonify({"message": "todo bien"}), 201
+
 #  Registrar usuario
 @app.route("/register", methods=["POST"])
 def register():
+    print(DB_PORT)
+    print(DB_HOST)
+    print(DB_NAME)
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
@@ -47,7 +55,7 @@ def login():
     password = data.get("password")
 
     user = User.query.filter_by(username=username).first()
-    if not user or not bcrypt.check_password_hash(user.password, password):
+    if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({"error": "Credenciales incorrectas"}), 401
 
     token = jwt.encode({
