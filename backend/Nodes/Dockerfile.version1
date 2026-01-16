@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+# Evitar buffers (logs inmediatos)
+ENV PYTHONUNBUFFERED=1
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Copiar dependencias primero (mejor cache)
+COPY requirements.txt .
+
+# Instalar dependencias
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el código del proyecto
+COPY . .
+
+# Exponer el puerto del nodo (control plane)
+EXPOSE 5000
+
+# Comando de arranque
+CMD ["python", "main.py"]
