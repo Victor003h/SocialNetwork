@@ -55,10 +55,13 @@ class Node:
         """
         return {
             "node_id": self.node_id,
+            "host":self.host,
+            "port":self.port,
             "service_name": self.service_name,
             "address": self.address,
             "role": self.role,
             "alive": self.alive,
+
         }
 
     @classmethod

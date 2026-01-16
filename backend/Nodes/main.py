@@ -28,18 +28,19 @@ def create_app(cluster: ClusterContext) -> Flask:
 
     @app.route("/info", methods=["GET"])
     def info():
-        return jsonify(cluster.to_dict())
+        return jsonify(cluster.to_dict()),200
     
 
     @app.route("/election", methods=["POST"])
     def election_request():
+        cluster.start_election()
         return {"status": "ok"}
     
     @app.route("/leader", methods=["POST"])
     def leader_announcement():
         data=request.json
         cluster.set_leader(data["leader_id"])
-        cluster.local_node.set_role="follower"
+        cluster.local_node.set_role("follower")
         print(f"[LEADER] Leader set to {data['leader_id']}")
         return {"status": "ok"}
     
@@ -47,7 +48,24 @@ def create_app(cluster: ClusterContext) -> Flask:
     def heartbeat():
         cluster.last_heartbeat = time.time()
         return {"status": "ok"}
+    
+    @app.route("/newNode", methods=["POST"])
+    def NewNode():
+        data=request.get_json()
 
+        peer = Node(
+            node_id=data["node_id"],
+            service_name=data["service_name"],
+            port="5000",
+        )
+        peer.host =data["host"],
+        peer.address = data["host"],
+        peer.alive=data["alive"],
+        peer.role=data["role"],
+    
+        cluster.peers[peer.node_id]=peer
+        print(f"[DISCOVERY] Node {peer.node_id} discovered ")
+        return {"status":"ok"}
     
     return app
 
@@ -72,11 +90,14 @@ def main():
     # -------------------------
     print("[DISCOVERY] Discovering peers...")
     cluster.discover_peers()
-    print(f"[DISCOVERY] Peers found: {len(cluster.peers)}")
 
+    print(f"[DISCOVERY] Peers found: {len(cluster.peers)}")
     for peer in cluster.get_peers():
         print(f"  - Peer: {peer.address}")
 
+
+    print("[DISCOVERY] Notifying my existence")
+    cluster.Notify_existence()
 
 
 
@@ -86,16 +107,16 @@ def main():
     print("[READY] Node ready for leader election")
     print(cluster)
 
-    cluster.start_election()
 
+    if not cluster.exists_leader():
+        print(" Leader not found")
+        cluster.start_election()
+    else:
+        print(f"Found Leader :{cluster.leader_id}")
 
-
-    # election=LeaderElection(cluster)
-    # election.start_election()
 
     heartbead=HeartbeatSender(cluster)
     heartbead.start()
-
 
     failure_detector=FailureDetector(cluster)
     failure_detector.start()

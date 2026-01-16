@@ -8,8 +8,8 @@ class FailureDetector:
     def __init__(
         self,
         cluster_context:ClusterContext,
-        heartbeat_timeout: float = 5.0,
-        check_interval: float = 1.0,
+        heartbeat_timeout: float = 10.0,
+        check_interval: float = 5.0,
     ):
         """
         cluster_context: objeto que maneja el estado del cluster
@@ -59,7 +59,7 @@ class FailureDetector:
             if self.cluster.local_node.is_leader():
                 continue
 
-            elapsed = time.time() - self._last_heartbeat
+            elapsed = time.time() - self.cluster.last_heartbeat
 
             if elapsed > self.heartbeat_timeout:
                 print("[FailureDetector] Leader timeout detected")
@@ -70,7 +70,7 @@ class FailureDetector:
         Notifica al cluster que el líder falló
         """
         # Evitar múltiples elecciones simultáneas
-        if self.cluster.is_election_in_progress:
+        if self.cluster.election_in_progress:
             return
 
         print("[FailureDetector] Triggering leader election")

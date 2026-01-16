@@ -1,7 +1,10 @@
 import socket
+from tarfile import data_filter
+import time
 from typing import Dict, List
-
+import os
 import requests
+from sqlalchemy import Boolean
 
 from node import Node
 
@@ -22,7 +25,7 @@ class ClusterContext:
         self.leader_id: int | None = None
 
         self.election_in_progress=False
-        self.last_heartbeat = 0
+        self.last_heartbeat = time.time()
 
     # -------------------------
     # Discovery
@@ -33,37 +36,47 @@ class ClusterContext:
         Descubre nodos pares usando DNS del servicio (Docker Swarm).
         """
         service_name = self.local_node.service_name
+        network_name=os.getenv("NETWORK-ALIAS","cluster_net_serv")
 
         try:
-            print("nsdfsdfsdf")
-            _, _, addresses = socket.gethostbyname_ex(self.local_node.host)
-            print(len(addresses))
+            _, _, addresses = socket.gethostbyname_ex(network_name)
         except socket.gaierror as e:
             print( e.errno )
             print (e.strerror)
             addresses = []
-
+        
+        self.peers={}
         for addr in addresses:
             # Excluirse a sí mismo
+           
             if addr == self.local_node.host:
                 continue
 
-            # Node ID desconocido aún (se resolverá luego)
+            response=  requests.get(f"http://{addr}:{self.local_node.port}/info", timeout=2)
+
+            data=response.json()
+            leader_id=data.get("leader_id")
+
+            if leader_id : 
+                self.leader_id=leader_id
+                self.local_node.role="follower"
+
+            node=data.get("local_node",{})
             peer = Node(
-                node_id=-1,
-                service_name=service_name,
+                node_id=node.get("node_id"),
+                service_name=node.get("service_name"),
                 port=self.local_node.port,
             )
             peer.host = addr
             peer.address = f"{addr}:{peer.port}"
 
-            self._register_peer(peer)
+            self.peers[peer.node_id]=peer
+
 
     def _register_peer(self, peer: Node):
         """
         Registra un peer si no existe ya.
         """
-        # node_id aún no es confiable, se ajustará en fase 2
         for existing in self.peers.values():
             if existing.address == peer.address:
                 return
@@ -91,6 +104,7 @@ class ClusterContext:
         if self.election_in_progress:
             return
 
+
         self.election_in_progress = True
         local_id = self.local_node.node_id
         higher_nodes = [
@@ -102,7 +116,6 @@ class ClusterContext:
         for peer in higher_nodes:
             try:
                 requests.post(f"http://{peer.address}/election", timeout=2)
-                print(f"[ELECTION] Higher node {peer.node_id} responded")
                 self.election_in_progress = False
                 return
             except requests.RequestException:
@@ -130,17 +143,13 @@ class ClusterContext:
 
         self.election_in_progress = False
 
-    
-
-
 
     def set_leader(self, node_id: int):
         self.leader_id = node_id
 
-    def get_leader(self) -> Node | None:
-        if self.leader_id == self.local_node.node_id:
-            return self.local_node
-        return self.peers.get(self.leader_id)
+    def exists_leader(self) -> Boolean:
+        return self.leader_id!=None
+       
 
     def to_dict(self) -> dict:
         """
@@ -158,3 +167,8 @@ class ClusterContext:
             f"peers={len(self.peers)} "
             f"leader={self.leader_id}>"
         )
+
+    def Notify_existence(self):
+        for peer in self.peers.values():
+            data=self.local_node.to_dict()
+            requests.post(f"http://{peer.address}/newNode",json=data ,timeout=2)
