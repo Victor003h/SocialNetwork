@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Global Feed</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0a0a0b",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: "Plus Jakarta Sans", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white transition-colors duration-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col max-w-md mx-auto border-x border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark">
+<header class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8 shrink-0 cursor-pointer" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBZDyhSE1OOlaj-8C3aAbZKXwhqyWH2k4H2dpeIaUOk48yK7PTqp6tEnCBDOlqp8Timb2JsY9vj5Whk11XcYVt8BKKnM4jhbmYUIm3ha7GP12InGH_9v6sOU_ezly31ComfIhk7HgWKFKJpUSOjrTO3fH-waMsOIHb0JKLnK7AQuCMiOOuEn7vIfZUuDiYH2Dx-035ig3CVRZXcyuka9PEHXHqwXcvUvnBraOMpbDT10c9fvfPCFbSwwBrIvziEeyMusaZHUtIb11Uz");'></div>
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+<input class="w-full bg-slate-100 dark:bg-slate-900 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/20 placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="Search by username..." type="text"/>
+</div>
+<button class="text-primary p-1">
+<span class="material-symbols-outlined">group_add</span>
+</button>
+</div>
+</header>
+<main class="flex-1 pb-24">
+<div class="p-4 border-b border-slate-100 dark:border-slate-800">
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Connected Friends</h3>
+<button class="text-primary text-xs font-bold">View All</button>
+</div>
+<div class="flex gap-4 overflow-x-auto no-scrollbar">
+<div class="flex flex-col items-center gap-1 shrink-0">
+<div class="size-12 rounded-full ring-2 ring-primary p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBN1w078p-UsdxKXUZs0zo_RSNVbrSqLBDPHSgTwvzlFRL9R_v8MQnrlEtBvMlY5ZXZOAecvsgTgatn6taNDPoR4283CoEUsiCvrNdONOYvtEeOb0Et0VYg7qMcgfTE1JDF5xvXfpR_EcVSOQYsU5G9_gVEi61aAHdJ1djFfyxOxVMzD72ewFuuhl-Q2SN4KMKMeSdn60kN1pPms8qzr_qkf0Q-Hj1ckikXhKn4UjSqlqr6XriV7QED066xUw-W4K1DTjKaxnhB7kdD");'></div>
+</div>
+<span class="text-[10px] font-medium truncate w-12 text-center">Satoshi</span>
+</div>
+<div class="flex flex-col items-center gap-1 shrink-0">
+<div class="size-12 rounded-full border-2 border-slate-200 dark:border-slate-800 p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC84SsF9pUbdCFzwo3x-f1gQh47SDM1QNa-Jv8GWpIAIWT-mJbnD9TaCEqUGz85pilA-65mEXxQF7Z5KBkWIY1tYdEyLh8Llnn4bKs683RR21rPCnZA4a4VKpKh6ejoZtSo6KIyF6Utg6w-yQLvfTvbhIIQc6I1pXLr-7ptu3LMHA2G2t9dwC-r79IFZOc4NGB8Ugxsrvw3dakfGJx1AUCfgt5ro4zqozpFcZcypBil93NYxgZpKhoNZXfFp7QkjtaHrBb-fM3yUFyz");'></div>
+</div>
+<span class="text-[10px] font-medium truncate w-12 text-center">Elena</span>
+</div>
+<div class="flex flex-col items-center gap-1 shrink-0">
+<div class="size-12 rounded-full border-2 border-slate-200 dark:border-slate-800 p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC1VrWMAGTj7Tc19_wOGszfsQVUCNbnnk0EBJ0r7zTPayNwIl-q0BPKy0SpxxSMTtDgZhoCc5mJ1DKTEhuL1nBtRoKSlQrM4tkoSh-Rx5ZSSmThvM1SmEMXehCNLy7kDK9McYImVn4oW3bWTVggOp0n0wPr9EQ9yKl1tkkPpFM3uAuQEvxRnpeiGupuBP8QQBosZTPutWpms3qcZ8chG5uTwQNE6jPJ35getCpDeFL8k8rSCHKaR3bc9vfSxXKiVLiT1kdZxs-Tkosi");'></div>
+</div>
+<span class="text-[10px] font-medium truncate w-12 text-center">Marco</span>
+</div>
+<div class="flex flex-col items-center gap-1 shrink-0">
+<div class="size-12 rounded-full border-2 border-slate-200 dark:border-slate-800 flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+<span class="material-symbols-outlined text-slate-400">add</span>
+</div>
+<span class="text-[10px] font-medium truncate w-12 text-center">Find</span>
+</div>
+</div>
+</div>
+<div class="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
+<div class="flex gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 shrink-0" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBZDyhSE1OOlaj-8C3aAbZKXwhqyWH2k4H2dpeIaUOk48yK7PTqp6tEnCBDOlqp8Timb2JsY9vj5Whk11XcYVt8BKKnM4jhbmYUIm3ha7GP12InGH_9v6sOU_ezly31ComfIhk7HgWKFKJpUSOjrTO3fH-waMsOIHb0JKLnK7AQuCMiOOuEn7vIfZUuDiYH2Dx-035ig3CVRZXcyuka9PEHXHqwXcvUvnBraOMpbDT10c9fvfPCFbSwwBrIvziEeyMusaZHUtIb11Uz");'></div>
+<div class="flex-1 flex flex-col gap-2">
+<textarea class="w-full bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 resize-none text-[17px] p-0 min-h-[40px]" placeholder="What's happening?" rows="1"></textarea>
+<div class="flex items-center justify-between mt-2">
+<div class="flex gap-4">
+<button class="text-primary">
+<span class="material-symbols-outlined text-[22px]">image</span>
+</button>
+<button class="text-primary">
+<span class="material-symbols-outlined text-[22px]">gif_box</span>
+</button>
+<button class="text-primary">
+<span class="material-symbols-outlined text-[22px]">sentiment_satisfied</span>
+</button>
+</div>
+<button class="bg-primary text-white px-6 py-1.5 rounded-full text-sm font-bold shadow-sm">
+                                Post
+                            </button>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+<article class="p-4 flex gap-3 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 shrink-0" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBN1w078p-UsdxKXUZs0zo_RSNVbrSqLBDPHSgTwvzlFRL9R_v8MQnrlEtBvMlY5ZXZOAecvsgTgatn6taNDPoR4283CoEUsiCvrNdONOYvtEeOb0Et0VYg7qMcgfTE1JDF5xvXfpR_EcVSOQYsU5G9_gVEi61aAHdJ1djFfyxOxVMzD72ewFuuhl-Q2SN4KMKMeSdn60kN1pPms8qzr_qkf0Q-Hj1ckikXhKn4UjSqlqr6XriV7QED066xUw-W4K1DTjKaxnhB7kdD");'></div>
+<div class="flex-1 flex flex-col">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1">
+<span class="font-bold text-slate-900 dark:text-white text-[15px]">Satoshi Nakamoto</span>
+<span class="text-slate-500 text-sm">@sat</span>
+<span class="text-slate-400 text-xs">· 2m</span>
+</div>
+<button class="text-slate-400">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+<p class="text-slate-800 dark:text-slate-200 text-[15px] mt-1 leading-relaxed">
+                            The block synchronization latency between Tokyo and London has dropped significantly. Consensus is hitting new peaks. 🌐
+                        </p>
+<div class="flex items-center justify-between mt-3 pr-8 max-w-sm">
+<button class="flex items-center gap-1 text-slate-500 hover:text-primary transition-colors group">
+<span class="material-symbols-outlined text-xl group-hover:bg-primary/10 p-1.5 rounded-full">chat_bubble</span>
+<span class="text-xs">12</span>
+</button>
+<button class="flex items-center gap-1 text-slate-500 hover:text-green-500 transition-colors group">
+<span class="material-symbols-outlined text-xl group-hover:bg-green-500/10 p-1.5 rounded-full">sync_alt</span>
+<span class="text-xs">42</span>
+</button>
+<button class="flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors group">
+<span class="material-symbols-outlined text-xl group-hover:bg-red-500/10 p-1.5 rounded-full">favorite</span>
+<span class="text-xs">142</span>
+</button>
+<button class="flex items-center text-slate-500 hover:text-primary transition-colors group">
+<span class="material-symbols-outlined text-xl group-hover:bg-primary/10 p-1.5 rounded-full">share</span>
+</button>
+</div>
+</div>
+</article>
+<article class="p-4 flex gap-3 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 shrink-0" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC84SsF9pUbdCFzwo3x-f1gQh47SDM1QNa-Jv8GWpIAIWT-mJbnD9TaCEqUGz85pilA-65mEXxQF7Z5KBkWIY1tYdEyLh8Llnn4bKs683RR21rPCnZA4a4VKpKh6ejoZtSo6KIyF6Utg6w-yQLvfTvbhIIQc6I1pXLr-7ptu3LMHA2G2t9dwC-r79IFZOc4NGB8Ugxsrvw3dakfGJx1AUCfgt5ro4zqozpFcZcypBil93NYxgZpKhoNZXfFp7QkjtaHrBb-fM3yUFyz");'></div>
+<div class="flex-1 flex flex-col">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1">
+<span class="font-bold text-slate-900 dark:text-white text-[15px]">Elena Wright</span>
+<span class="text-slate-500 text-sm">@elena</span>
+<span class="text-slate-400 text-xs">· 15m</span>
+</div>
+<button class="text-slate-400">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+<p class="text-slate-800 dark:text-slate-200 text-[15px] mt-1 leading-relaxed">
+                            Testing out the new geographic scalability protocols. Shard hopping is working perfectly!
+                        </p>
+<div class="flex items-center justify-between mt-3 pr-8 max-w-sm">
+<button class="flex items-center gap-1 text-slate-500 hover:text-primary transition-colors group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">chat_bubble</span>
+<span class="text-xs">4</span>
+</button>
+<button class="flex items-center gap-1 text-slate-500 hover:text-green-500 transition-colors group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">sync_alt</span>
+<span class="text-xs">12</span>
+</button>
+<button class="flex items-center gap-1 text-red-500 transition-colors group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="text-xs">88</span>
+</button>
+<button class="flex items-center text-slate-500 hover:text-primary transition-colors group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">share</span>
+</button>
+</div>
+</div>
+</article>
+<article class="p-4 flex gap-3 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 shrink-0" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC1VrWMAGTj7Tc19_wOGszfsQVUCNbnnk0EBJ0r7zTPayNwIl-q0BPKy0SpxxSMTtDgZhoCc5mJ1DKTEhuL1nBtRoKSlQrM4tkoSh-Rx5ZSSmThvM1SmEMXehCNLy7kDK9McYImVn4oW3bWTVggOp0n0wPr9EQ9yKl1tkkPpFM3uAuQEvxRnpeiGupuBP8QQBosZTPutWpms3qcZ8chG5uTwQNE6jPJ35getCpDeFL8k8rSCHKaR3bc9vfSxXKiVLiT1kdZxs-Tkosi");'></div>
+<div class="flex-1 flex flex-col">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1">
+<span class="font-bold text-slate-900 dark:text-white text-[15px]">Marco Polo</span>
+<span class="text-slate-500 text-sm">@marco</span>
+<span class="text-slate-400 text-xs">· 1h</span>
+</div>
+<button class="text-slate-400">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+<p class="text-slate-800 dark:text-slate-200 text-[15px] mt-1 leading-relaxed">
+                            Finally settled in Venice. The connectivity looks stable.
+                        </p>
+<div class="mt-3 rounded-2xl overflow-hidden h-44 relative bg-slate-100 dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+<div class="absolute inset-0 bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBgE5wu2X8WVqQkZNfcQfuVD2Ffx8JCwJtCvpssEeeEEJQJZ-V5Xu6vR1Rjnhngxj0rCS-2elttIGkUpesKrpO_e5mVVImU6l2Zia1I3aUXiWPbK37G1rqLpRwwJ1BrL5MQrHntJ4OYFtrRLXIPZ6A4K9QdgNrERKFklCP-BwvEHZm8EzwzN_Xzs6BT4eizDwdRNxkTH4BLeg8yT3i1MfW4yyNlEV0XGtvi71LKZw5xUPgC2hw78EsrT7chjvDAavg2-qAIAhJGFKQ_");'></div>
+</div>
+<div class="flex items-center justify-between mt-3 pr-8 max-w-sm">
+<button class="flex items-center gap-1 text-slate-500 group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">chat_bubble</span>
+<span class="text-xs">2</span>
+</button>
+<button class="flex items-center gap-1 text-slate-500 group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">sync_alt</span>
+<span class="text-xs">5</span>
+</button>
+<button class="flex items-center gap-1 text-slate-500 group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">favorite</span>
+<span class="text-xs">31</span>
+</button>
+<button class="flex items-center text-slate-500 group">
+<span class="material-symbols-outlined text-xl p-1.5 rounded-full">share</span>
+</button>
+</div>
+</div>
+</article>
+</div>
+</main>
+<button class="fixed bottom-24 right-6 size-14 bg-primary text-white rounded-full flex items-center justify-center shadow-xl shadow-primary/30 z-40 sm:hidden">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+<nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 dark:bg-background-dark/95 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 flex justify-around items-center h-20 pb-5">
+<button class="flex flex-col items-center gap-1 text-slate-900 dark:text-white">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="text-[10px] font-bold">Feed</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">search</span>
+<span class="text-[10px] font-bold">Search</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">notifications</span>
+<span class="text-[10px] font-bold">Alerts</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[10px] font-bold">Friends</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-bold">Profile</span>
+</button>
+</nav>
+</div>
+
+</body></html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>User Profile - Distributed Network</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "secondary": "#0bda5e",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .material-symbols-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        body {
+            font-family: "Plus Jakarta Sans", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .map-glow {
+            box-shadow: inset 0 0 40px rgba(19, 91, 236, 0.1);
+        }
+
+        .hotspot {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.5);
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white transition-colors duration-200">
+    <div
+        class="relative flex h-auto min-h-screen w-full flex-col max-w-md mx-auto border-x border-slate-200 dark:border-slate-800">
+        <header class="relative">
+            <div class="h-32 bg-gradient-to-r from-primary to-blue-600 w-full relative overflow-hidden">
+                <div
+                    class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+                </div>
+            </div>
+            <div class="px-4 -mt-12 flex flex-col gap-4">
+                <div class="flex justify-between items-end">
+                    <div class="relative">
+                        <div class="size-24 rounded-2xl border-4 border-background-light dark:border-background-dark bg-center bg-cover bg-no-repeat shadow-xl overflow-hidden"
+                            style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBZDyhSE1OOlaj-8C3aAbZKXwhqyWH2k4H2dpeIaUOk48yK7PTqp6tEnCBDOlqp8Timb2JsY9vj5Whk11XcYVt8BKKnM4jhbmYUIm3ha7GP12InGH_9v6sOU_ezly31ComfIhk7HgWKFKJpUSOjrTO3fH-waMsOIHb0JKLnK7AQuCMiOOuEn7vIfZUuDiYH2Dx-035ig3CVRZXcyuka9PEHXHqwXcvUvnBraOMpbDT10c9fvfPCFbSwwBrIvziEeyMusaZHUtIb11Uz");'>
+                        </div>
+                        <div
+                            class="absolute -bottom-1 -right-1 size-6 bg-secondary rounded-full border-2 border-background-light dark:border-background-dark flex items-center justify-center">
+                            <span class="material-symbols-outlined text-white text-[14px]">verified</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pb-1">
+                        <button
+                            class="px-5 py-2 rounded-full bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25">Follow</button>
+                        <button
+                            class="size-10 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white bg-white/10 backdrop-blur-sm">
+                            <span class="material-symbols-outlined">more_horiz</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <h1 class="text-2xl font-bold tracking-tight">Satoshi Nakamoto</h1>
+                    <div class="flex items-center gap-2">
+                        <span class="text-primary font-semibold text-sm">@sat@tokyo-node</span>
+                        <span
+                            class="px-2 py-0.5 rounded-full bg-secondary/10 text-secondary text-[10px] font-bold uppercase tracking-wider">Origin:
+                            JP-01</span>
+                    </div>
+                    <p class="text-slate-600 dark:text-slate-400 text-sm mt-2 leading-relaxed">
+                        Architecting the mesh. Exploring decentralized protocols and geographic horizontal scaling.
+                        Building the future, one node at a time.
+                    </p>
+                </div>
+            </div>
+        </header>
+        <section class="mt-6 px-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400">Follower Distribution</h3>
+                <span class="text-xs font-medium text-secondary flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-secondary rounded-full animate-pulse"></span>
+                    Live Data
+                </span>
+            </div>
+            <div
+                class="relative w-full aspect-[16/9] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-100 dark:bg-slate-900/50 map-glow">
+                <div class="absolute inset-0 bg-cover bg-center opacity-40 grayscale contrast-125 dark:opacity-20"
+                    style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBgE5wu2X8WVqQkZNfcQfuVD2Ffx8JCwJtCvpssEeeEEJQJZ-V5Xu6vR1Rjnhngxj0rCS-2elttIGkUpesKrpO_e5mVVImU6l2Zia1I3aUXiWPbK37G1rqLpRwwJ1BrL5MQrHntJ4OYFtrRLXIPZ6A4K9QdgNrERKFklCP-BwvEHZm8EzwzN_Xzs6BT4eizDwdRNxkTH4BLeg8yT3i1MfW4yyNlEV0XGtvi71LKZw5xUPgC2hw78EsrT7chjvDAavg2-qAIAhJGFKQ_");'>
+                </div>
+                <div
+                    class="absolute top-[30%] left-[20%] w-3 h-3 bg-primary rounded-full blur-[2px] hotspot shadow-[0_0_10px_#135bec]">
+                </div>
+                <div
+                    class="absolute top-[45%] left-[50%] w-4 h-4 bg-secondary rounded-full blur-[2px] hotspot shadow-[0_0_10px_#0bda5e]">
+                </div>
+                <div
+                    class="absolute top-[60%] left-[80%] w-2 h-2 bg-primary rounded-full blur-[2px] hotspot shadow-[0_0_10px_#135bec]">
+                </div>
+                <div
+                    class="absolute top-[25%] left-[70%] w-3 h-3 bg-secondary rounded-full blur-[2px] hotspot shadow-[0_0_10px_#0bda5e]">
+                </div>
+                <div class="absolute bottom-3 left-3 flex flex-col gap-1">
+                    <p class="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Global Coverage</p>
+                    <p class="text-lg font-bold text-slate-900 dark:text-white">142 Countries</p>
+                </div>
+            </div>
+        </section>
+        <section class="grid grid-cols-3 gap-3 px-4 mt-6">
+            <div
+                class="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-3 rounded-xl flex flex-col items-center gap-1">
+                <span class="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase">Followers</span>
+                <span class="text-lg font-bold">12.8K</span>
+            </div>
+            <div
+                class="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-3 rounded-xl flex flex-col items-center gap-1">
+                <span class="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase">Following</span>
+                <span class="text-lg font-bold">482</span>
+            </div>
+            <div
+                class="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-3 rounded-xl flex flex-col items-center gap-1">
+                <span class="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase">Nodes</span>
+                <span class="text-lg font-bold text-secondary">314</span>
+            </div>
+        </section>
+        <section class="mt-8 border-b border-slate-200 dark:border-slate-800">
+            <div class="flex overflow-x-auto no-scrollbar px-4">
+                <button
+                    class="px-4 py-3 border-b-2 border-primary text-slate-900 dark:text-white text-sm font-bold whitespace-nowrap">Micro-Posts</button>
+                <button
+                    class="px-4 py-3 border-b-2 border-transparent text-slate-500 text-sm font-medium whitespace-nowrap">Media</button>
+                <button
+                    class="px-4 py-3 border-b-2 border-transparent text-slate-500 text-sm font-medium whitespace-nowrap">Network
+                    Presence</button>
+            </div>
+        </section>
+        <main class="flex-1 pb-24">
+            <div class="flex flex-col gap-px bg-slate-200 dark:bg-slate-800">
+                <article class="bg-white dark:bg-background-dark p-4 flex gap-3">
+                    <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 shrink-0"
+                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBZDyhSE1OOlaj-8C3aAbZKXwhqyWH2k4H2dpeIaUOk48yK7PTqp6tEnCBDOlqp8Timb2JsY9vj5Whk11XcYVt8BKKnM4jhbmYUIm3ha7GP12InGH_9v6sOU_ezly31ComfIhk7HgWKFKJpUSOjrTO3fH-waMsOIHb0JKLnK7AQuCMiOOuEn7vIfZUuDiYH2Dx-035ig3CVRZXcyuka9PEHXHqwXcvUvnBraOMpbDT10c9fvfPCFbSwwBrIvziEeyMusaZHUtIb11Uz");'>
+                    </div>
+                    <div class="flex-1 flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-900 dark:text-white text-sm">Satoshi Nakamoto</span>
+                            <span class="text-slate-400 text-xs">2m</span>
+                        </div>
+                        <p class="text-slate-700 dark:text-slate-300 text-[15px] mt-1 leading-relaxed">
+                            The block synchronization latency between Tokyo and London has dropped to 12ms.
+                            Decentralized consensus is hitting new peaks. 🌐
+                        </p>
+                        <div class="flex items-center justify-between mt-4 max-w-xs">
+                            <button class="flex items-center gap-1.5 text-slate-400"><span
+                                    class="material-symbols-outlined text-[18px]">chat_bubble</span><span
+                                    class="text-xs">12</span></button>
+                            <button class="flex items-center gap-1.5 text-slate-400"><span
+                                    class="material-symbols-outlined text-[18px]">rebase_edit</span><span
+                                    class="text-xs font-bold uppercase tracking-tighter">RE-POST</span></button>
+                            <button class="flex items-center gap-1.5 text-primary"><span
+                                    class="material-symbols-outlined text-[18px] material-symbols-fill">favorite</span><span
+                                    class="text-xs">142</span></button>
+                            <div class="flex items-center text-secondary"><span
+                                    class="material-symbols-outlined text-[18px]">cloud_done</span></div>
+                        </div>
+                    </div>
+                </article>
+                <article class="bg-white dark:bg-background-dark p-4 flex gap-3">
+                    <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 shrink-0"
+                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBZDyhSE1OOlaj-8C3aAbZKXwhqyWH2k4H2dpeIaUOk48yK7PTqp6tEnCBDOlqp8Timb2JsY9vj5Whk11XcYVt8BKKnM4jhbmYUIm3ha7GP12InGH_9v6sOU_ezly31ComfIhk7HgWKFKJpUSOjrTO3fH-waMsOIHb0JKLnK7AQuCMiOOuEn7vIfZUuDiYH2Dx-035ig3CVRZXcyuka9PEHXHqwXcvUvnBraOMpbDT10c9fvfPCFbSwwBrIvziEeyMusaZHUtIb11Uz");'>
+                    </div>
+                    <div class="flex-1 flex flex-col">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-900 dark:text-white text-sm">Satoshi Nakamoto</span>
+                            <span class="text-slate-400 text-xs">1h</span>
+                        </div>
+                        <p class="text-slate-700 dark:text-slate-300 text-[15px] mt-1 leading-relaxed">
+                            New shards allocated in the Southeast Asia region. The network is breathing.
+                        </p>
+                        <div class="flex items-center justify-between mt-4 max-w-xs">
+                            <button class="flex items-center gap-1.5 text-slate-400"><span
+                                    class="material-symbols-outlined text-[18px]">chat_bubble</span><span
+                                    class="text-xs">3</span></button>
+                            <button class="flex items-center gap-1.5 text-slate-400"><span
+                                    class="material-symbols-outlined text-[18px]">rebase_edit</span><span
+                                    class="text-xs font-bold uppercase tracking-tighter">RE-POST</span></button>
+                            <button class="flex items-center gap-1.5 text-slate-400"><span
+                                    class="material-symbols-outlined text-[18px]">favorite</span><span
+                                    class="text-xs">56</span></button>
+                            <div class="flex items-center text-secondary"><span
+                                    class="material-symbols-outlined text-[18px]">cloud_done</span></div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </main>
+        <nav
+            class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/90 dark:bg-background-dark/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-20 pb-4 z-[100]">
+            <button class="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400">
+                <span class="material-symbols-outlined">home</span>
+                <span class="text-[10px] font-bold">Feed</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400">
+                <span class="material-symbols-outlined">explore</span>
+                <span class="text-[10px] font-bold">Explore</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400">
+                <span class="material-symbols-outlined">notifications</span>
+                <span class="text-[10px] font-bold">Alerts</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400">
+                <span class="material-symbols-outlined">dns</span>
+                <span class="text-[10px] font-bold">Nodes</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-primary">
+                <span class="material-symbols-outlined material-symbols-fill">person</span>
+                <span class="text-[10px] font-bold">Profile</span>
+            </button>
+        </nav>
+    </div>
+
+</body>
+
+</html>
