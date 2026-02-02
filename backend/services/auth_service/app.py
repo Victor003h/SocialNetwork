@@ -1,4 +1,5 @@
 from flask import Flask,request,jsonify
+import requests
 from model import User
 from db_config import db,DB_HOST,DB_NAME,DB_PASSWORD,DB_PORT,DB_USER
 from flask_sqlalchemy import SQLAlchemy
@@ -12,12 +13,42 @@ app = Flask(__name__)
 
 
 
-app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5433/{DB_NAME}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db.init_app(app)
+# app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5433/{DB_NAME}"
+# app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# db.init_app(app)
 bcrypt = Bcrypt(app)
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "supersecretkey")
+
+DB_CLUSTER_URL="http://cluster_net_serv:5000"
+
+
+@app.route("/conected",methods=["GET"])
+def conected():
+    res = requests.get(
+    f"{DB_CLUSTER_URL}/info", timeout=3)
+    
+    res.raise_for_status()
+    return res.json()
+
+
+@app.route("/create-user",methods=["POST"])
+def create_user():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    res = requests.post(
+        f"{DB_CLUSTER_URL}/db/users",
+        json={
+            "username": username,
+            "password": bcrypt.generate_password_hash(password).decode("utf-8")
+        },
+        timeout=3
+    )
+    res.raise_for_status()
+    return res.json()
+
 
 
 @app.route("/check",methods=["GET"])

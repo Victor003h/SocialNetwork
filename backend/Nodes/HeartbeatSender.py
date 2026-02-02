@@ -1,6 +1,7 @@
 import threading
 import time
 import requests
+from sqlalchemy import PrimaryKeyConstraint
 
 from cluster import ClusterContext
 
@@ -12,7 +13,7 @@ class HeartbeatSender:
         self.running = False
 
     def start(self):
-        if self.running and not self.cluster.local_node.is_leader()  :
+        if self.running  :
             return
         self.running = True
         threading.Thread(target=self._loop, daemon=True).start()
@@ -21,18 +22,23 @@ class HeartbeatSender:
         self.running = False
 
     def _loop(self):
+        print(f"[HEARTBEAT] Node {self.cluster.local_node.node_id} starts sending heartbeat")
         while self.running:
+         
             if not self.cluster.local_node.is_leader():
                 time.sleep(self.interval)
                 continue
 
             for peer in self.cluster.get_peers():
+               
                 try:
-                    requests.post(
-                        f"{peer.address}/cluster/heartbeat",
-                        timeout=1
-                    )
-                except Exception:
+                    print(f"[HEARTBEAT] manda heartbeat a {peer.address}")
+                    print(peer.address)
+                    requests.post(f"http://{peer.address}/heartbeat",timeout=1)
+                    print(f"[HEARTBEAT] Sent to {peer.address}")
+
+                except Exception as e:
+                    print(f"[HEARTBEAT] fallo al mandar heartbeat a  {peer.address}")
                     # no hacemos nada: fallo parcial permitido
                     pass
 

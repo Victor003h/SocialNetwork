@@ -1,12 +1,16 @@
 import threading
 import time
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, request
 from requests import RequestException
+import os 
+import requests
+from sqlalchemy import create_engine, false
 
 
 from Failure_Detector import FailureDetector
 from HeartbeatSender import HeartbeatSender
 
+from models.user import User
 from node import Node
 from cluster import ClusterContext
 
@@ -17,6 +21,7 @@ def create_app(cluster: ClusterContext) -> Flask:
     (no endpoints de negocio)
     """
     app = Flask(__name__)
+
 
     @app.route("/health", methods=["GET"])
     def health():
@@ -33,8 +38,19 @@ def create_app(cluster: ClusterContext) -> Flask:
 
     @app.route("/election", methods=["POST"])
     def election_request():
-        cluster.start_election()
-        return {"status": "ok"}
+        print("[ELECTION] election request received")
+
+        # responder INMEDIATO
+        response = {"status": "ok"}
+
+        # iniciar elección en background
+        threading.Thread(
+            target=cluster.start_election,
+            daemon=True
+        ).start()
+
+        return response, 200
+
     
     @app.route("/leader", methods=["POST"])
     def leader_announcement():
@@ -44,11 +60,15 @@ def create_app(cluster: ClusterContext) -> Flask:
         print(f"[LEADER] Leader set to {data['leader_id']}")
         return {"status": "ok"}
     
-    @app.route("/cluster/heartbeat", methods=["POST"])
+    @app.route("/heartbeat", methods=["POST"])
     def heartbeat():
         cluster.last_heartbeat = time.time()
+        print("[HEARTBEAT] Received from leader")
+        print(f"[HEARTBEAT] Last heartbeat {cluster.last_heartbeat}")
+
         return {"status": "ok"}
     
+
     @app.route("/newNode", methods=["POST"])
     def NewNode():
         data=request.get_json()
@@ -58,20 +78,57 @@ def create_app(cluster: ClusterContext) -> Flask:
             service_name=data["service_name"],
             port="5000",
         )
-        peer.host =data["host"],
-        peer.address = data["host"],
-        peer.alive=data["alive"],
-        peer.role=data["role"],
+        peer.host =data["host"]
+        peer.address = f"{data['host']}:5000"
+        peer.alive=data["alive"]
+        peer.role=data["role"]
     
         cluster.peers[peer.node_id]=peer
         print(f"[DISCOVERY] Node {peer.node_id} discovered ")
+        print(peer.host)
+        
+        print(peer.address)
+
         return {"status":"ok"}
     
+    @app.route("/start_heartbeat", methods=["POST"])
+    def StartHeartBeat():
+        heartbead=HeartbeatSender(cluster)
+        heartbead.start()
+        return {"status":"ok"}
+    
+    @app.route("/db/users", methods=["POST"])
+    def create_user():
+        redirect= False
+        if not cluster.local_node.is_leader():
+            leader_address=cluster.peers[cluster.leader_id].address
+            redirect=True
+            requests.post(f"http://{leader_address}/db/users",json=request.json ,timeout=2)
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        if redirect:
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        
+        data = request.json
+        user = User(
+            username=data["username"],
+            password_hash=data["password"]
+        )
+        session=cluster.database.get_session()
+        session.add(user)
+        session.commit()
+
+        return jsonify({"id": user.id}), 201
+
+
+
     return app
 
 
 def main():
     print("=== Starting DB Cluster Node ===")
+
+
+
 
     # -------------------------
     # 1. Identidad del nodo
@@ -83,6 +140,7 @@ def main():
     # 2. Inicializar contexto de cluster
     # -------------------------
     cluster = ClusterContext(local_node)
+    cluster.database.create_tables()
     print("[INIT] ClusterContext initialized")
 
     # -------------------------
@@ -99,8 +157,6 @@ def main():
     print("[DISCOVERY] Notifying my existence")
     cluster.Notify_existence()
 
-
-
     # -------------------------
     # 4. Nodo listo 
     # -------------------------
@@ -108,18 +164,21 @@ def main():
     print(cluster)
 
 
-    if not cluster.exists_leader():
+    if  len(cluster.peers)==0:
         print(" Leader not found")
-        cluster.start_election()
+        cluster.local_node.set_role("leader")
+        cluster.set_leader(cluster.local_node.node_id)
+        
     else:
         print(f"Found Leader :{cluster.leader_id}")
 
 
-    heartbead=HeartbeatSender(cluster)
-    heartbead.start()
-
-    failure_detector=FailureDetector(cluster)
-    failure_detector.start()
+    if(cluster.local_node.is_leader()):
+        heartbead=HeartbeatSender(cluster)
+        heartbead.start()
+    else:
+        failure_detector=FailureDetector(cluster)
+        failure_detector.start()
 
     
     # -------------------------

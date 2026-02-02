@@ -27,7 +27,6 @@ class Node:
         Obtiene el hostname/IP del contenedor.
         En Docker Swarm esto corresponde al endpoint interno.
         """
-        print("Busca el host")
         try:
 
             host_id= socket.gethostname()

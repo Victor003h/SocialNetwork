@@ -6,6 +6,7 @@ import os
 import requests
 from sqlalchemy import Boolean
 
+from DataBase import Database
 from node import Node
 
 
@@ -26,6 +27,8 @@ class ClusterContext:
 
         self.election_in_progress=False
         self.last_heartbeat = time.time()
+
+        self.database = Database()
 
     # -------------------------
     # Discovery
@@ -55,13 +58,18 @@ class ClusterContext:
             response=  requests.get(f"http://{addr}:{self.local_node.port}/info", timeout=2)
 
             data=response.json()
+            
             leader_id=data.get("leader_id")
 
-            if leader_id : 
+            node=data.get("local_node",{})
+
+            role=node.get("role")
+            if role=="leader":
                 self.leader_id=leader_id
                 self.local_node.role="follower"
+                self.last_heartbeat=time.time()
+            
 
-            node=data.get("local_node",{})
             peer = Node(
                 node_id=node.get("node_id"),
                 service_name=node.get("service_name"),
@@ -69,6 +77,7 @@ class ClusterContext:
             )
             peer.host = addr
             peer.address = f"{addr}:{peer.port}"
+            peer.role=role
 
             self.peers[peer.node_id]=peer
 
@@ -104,7 +113,7 @@ class ClusterContext:
         if self.election_in_progress:
             return
 
-
+        self.discover_peers()
         self.election_in_progress = True
         local_id = self.local_node.node_id
         higher_nodes = [
@@ -112,11 +121,12 @@ class ClusterContext:
         ]
 
         print(f"[ELECTION] Node {local_id} starting election")
-
+       
         for peer in higher_nodes:
             try:
                 requests.post(f"http://{peer.address}/election", timeout=2)
                 self.election_in_progress = False
+                print(f"[ELECTION] recibo respuesta de  {peer.node_id}")
                 return
             except requests.RequestException:
                 continue
@@ -141,8 +151,11 @@ class ClusterContext:
             except requests.RequestException:
                 pass
 
-        self.election_in_progress = False
 
+        requests.post(f"http://{self.local_node.address}/start_heartbeat" ,timeout=2)  
+
+ 
+        self.election_in_progress = False
 
     def set_leader(self, node_id: int):
         self.leader_id = node_id
@@ -150,7 +163,6 @@ class ClusterContext:
     def exists_leader(self) -> Boolean:
         return self.leader_id!=None
        
-
     def to_dict(self) -> dict:
         """
         Representación del estado del cluster (debug / status endpoint).
@@ -171,4 +183,5 @@ class ClusterContext:
     def Notify_existence(self):
         for peer in self.peers.values():
             data=self.local_node.to_dict()
+            print(f"Notifinando a {peer.address}")
             requests.post(f"http://{peer.address}/newNode",json=data ,timeout=2)

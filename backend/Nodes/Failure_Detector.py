@@ -28,7 +28,7 @@ class FailureDetector:
     # ==============================
 
     def start(self):
-        if self._running and self.cluster.local_node.is_leader():
+        if self._running :
             return
 
         self._running = True
@@ -60,7 +60,8 @@ class FailureDetector:
                 continue
 
             elapsed = time.time() - self.cluster.last_heartbeat
-
+           # print(f"[FailureDetector] In time {time.time()} last heartbeat {self.cluster.last_heartbeat}")
+            
             if elapsed > self.heartbeat_timeout:
                 print("[FailureDetector] Leader timeout detected")
                 self._handle_leader_failure()

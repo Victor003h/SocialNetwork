@@ -4,3 +4,4 @@ flask_bcrypt
 pyjwt
 psycopg2-binary
 python-dotenv
+requests
