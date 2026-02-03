@@ -34,7 +34,7 @@ class HeartbeatSender:
                 try:
                     print(f"[HEARTBEAT] manda heartbeat a {peer.address}")
                     print(peer.address)
-                    requests.post(f"http://{peer.address}/heartbeat",timeout=1)
+                    requests.post(f"https://{peer.address}/heartbeat",timeout=1, **self.cluster.secure_args)
                     print(f"[HEARTBEAT] Sent to {peer.address}")
 
                 except Exception as e:

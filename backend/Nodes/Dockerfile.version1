@@ -5,6 +5,7 @@ ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
     iputils-ping \
+    gcc libffi-dev musl-dev \
     dnsutils \
     net-tools \
     && rm -rf /var/lib/apt/lists/*
@@ -21,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el código del proyecto
 COPY . .
 
+RUN mkdir -p /app/certs
 # Exponer el puerto del nodo (control plane)
 EXPOSE 5000
 

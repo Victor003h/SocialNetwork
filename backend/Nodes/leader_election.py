@@ -23,7 +23,7 @@ class LeaderElection:
 
         for peer in higher_nodes:
             try:
-                requests.post(f"http://{peer.address}/election", timeout=2)
+                requests.post(f"https://{peer.address}/election", timeout=2, **self.cluster.secure_args)
                 print(f"[ELECTION] Higher node {peer.node_id} responded")
                 self.election_in_progress = False
                 return
@@ -43,9 +43,10 @@ class LeaderElection:
         for peer in self.cluster.get_peers():
             try:
                 requests.post(
-                    f"http://{peer.address}/leader",
+                    f"https://{peer.address}/leader",
                     json={"leader_id": node.node_id},
-                    timeout=2
+                    timeout=2,
+                    **self.cluster.secure_args
                 )
             except requests.RequestException:
                 pass

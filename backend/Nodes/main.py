@@ -76,7 +76,7 @@ def create_app(cluster: ClusterContext) -> Flask:
         peer = Node(
             node_id=data["node_id"],
             service_name=data["service_name"],
-            port="5000",
+            port=5000,
         )
         peer.host =data["host"]
         peer.address = f"{data['host']}:5000"
@@ -99,11 +99,13 @@ def create_app(cluster: ClusterContext) -> Flask:
     
     @app.route("/db/users", methods=["POST"])
     def create_user():
-        redirect= False
+        redirect= False          
+        leader_address= cluster.peers[cluster.leader_id].address if (
+                        cluster.leader_id in cluster.peers) else None
+        
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address
             redirect=True
-            requests.post(f"http://{leader_address}/db/users",json=request.json ,timeout=2)
+            requests.post(f"https://{leader_address}/db/users",json=request.json ,timeout=2,**cluster.secure_args)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
@@ -189,7 +191,9 @@ def main():
     port = local_node.port
     print(f"[START] Control server running on port {port}")
 
-    app.run(host="0.0.0.0", port=port)
+    ssl_context = (cluster.cert_path, cluster.key_path)
+    
+    app.run(host="0.0.0.0", port=port,ssl_context=ssl_context)
 
 
 if __name__ == "__main__":

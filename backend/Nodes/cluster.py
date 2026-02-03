@@ -8,6 +8,7 @@ from sqlalchemy import Boolean
 
 from DataBase import Database
 from node import Node
+from backend.security.Cert_Manager import CertManager
 
 
 class ClusterContext:
@@ -29,7 +30,17 @@ class ClusterContext:
         self.last_heartbeat = time.time()
 
         self.database = Database()
-
+        
+        self.security = CertManager(cert_dir='certs')
+        
+        (self.cert_path, self.key_path), self.ca_path = self.security.get_context()
+        
+        # Definimos los argumentos estándar para requests seguros
+        self.secure_args = {
+            "cert": (self.cert_path, self.key_path), # Mi carta de presentación
+            "verify": self.ca_path,     # Contra qué valido a los demás
+            "timeout": 2
+        }
     # -------------------------
     # Discovery
     # -------------------------
@@ -55,7 +66,7 @@ class ClusterContext:
             if addr == self.local_node.host:
                 continue
 
-            response=  requests.get(f"http://{addr}:{self.local_node.port}/info", timeout=2)
+            response=  requests.get(f"https://{addr}:{self.local_node.port}/info", timeout=2, **self.secure_args)
 
             data=response.json()
             
@@ -124,7 +135,7 @@ class ClusterContext:
        
         for peer in higher_nodes:
             try:
-                requests.post(f"http://{peer.address}/election", timeout=2)
+                requests.post(f"https://{peer.address}/election", timeout=2, **self.secure_args)
                 self.election_in_progress = False
                 print(f"[ELECTION] recibo respuesta de  {peer.node_id}")
                 return
@@ -144,15 +155,16 @@ class ClusterContext:
         for peer in self.get_peers():
             try:
                 requests.post(
-                    f"http://{peer.address}/leader",
+                    f"https://{peer.address}/leader",
                     json={"leader_id": node.node_id},
-                    timeout=2
+                    timeout=2,
+                    **self.secure_args
                 )
             except requests.RequestException:
                 pass
 
 
-        requests.post(f"http://{self.local_node.address}/start_heartbeat" ,timeout=2)  
+        requests.post(f"https://{self.local_node.address}/start_heartbeat" ,timeout=2, **self.secure_args)  
 
  
         self.election_in_progress = False
@@ -160,8 +172,8 @@ class ClusterContext:
     def set_leader(self, node_id: int):
         self.leader_id = node_id
 
-    def exists_leader(self) -> Boolean:
-        return self.leader_id!=None
+    def exists_leader(self) -> bool:
+        return self.leader_id is not None
        
     def to_dict(self) -> dict:
         """
@@ -184,4 +196,4 @@ class ClusterContext:
         for peer in self.peers.values():
             data=self.local_node.to_dict()
             print(f"Notifinando a {peer.address}")
-            requests.post(f"http://{peer.address}/newNode",json=data ,timeout=2)
+            requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2, **self.secure_args)
