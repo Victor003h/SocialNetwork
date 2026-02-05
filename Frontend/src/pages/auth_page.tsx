@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { authService } from "../services/AuthService";
 
-const AuthPage: React.FC = () => {
+const AuthPage: React.FC<{ onAuthChange: () => void }> = ({ onAuthChange }) => {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -33,13 +33,21 @@ const AuthPage: React.FC = () => {
           password: formData.password,
         });
         alert("¡Conexión exitosa al Gateway!");
+        onAuthChange();
         // Aquí harías: window.location.href = '/feed';
       } else {
-        await authService.register(formData);
-        alert(
-          "Usuario registrado en el sistema distribuido. Ahora inicia sesión.",
-        );
-        setActiveTab("login");
+        const registerResult = await authService.register(formData);
+        if (registerResult == 200) {
+          alert(
+            "Usuario registrado en el sistema distribuido. Ahora inicia sesión.",
+          );
+          setActiveTab("login");
+        } else {
+          setError(
+            "Error al registrar el usuario servidor respondió con código: " +
+              registerResult,
+          );
+        }
       }
     } catch (err: unknown) {
       setError((err as Error).message || "Error desconocido");
@@ -124,24 +132,6 @@ const AuthPage: React.FC = () => {
                 required
               />
             </div>
-
-            {/* Campo Email (Solo registro) */}
-            {activeTab === "register" && (
-              <div className="mb-3 animate__animated animate__fadeIn">
-                <label className="form-label fw-bold small text-muted">
-                  EMAIL ADDRESS
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  className="form-control form-control-lg"
-                  placeholder="name@example.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            )}
 
             {/* Campo Password (Común) */}
             <div className="mb-4">

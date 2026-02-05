@@ -1,3 +1,4 @@
+from operator import add
 import select
 import socket
 from tarfile import data_filter
@@ -44,8 +45,8 @@ class ClusterContext:
         # Definimos los argumentos estándar para requests seguros
         self.secure_args = {
             "cert": (self.cert_path, self.key_path), # Mi carta de presentación
-            "verify": self.ca_path,     # Contra qué valido a los demás
-            "timeout": 2
+            "verify": self.ca_path    # Contra qué valido a los demás
+            
         }
     # -------------------------
     # Discovery
@@ -67,6 +68,8 @@ class ClusterContext:
         
         self.peers={}
         for addr in addresses:
+            addr,_,_=socket.gethostbyaddr(addr)
+            print(f"Descubriendo nodo en {addr}")
             # Excluirse a sí mismo
            
             if addr == self.local_node.host:
@@ -202,13 +205,13 @@ class ClusterContext:
         for peer in self.peers.values():
             data=self.local_node.to_dict()
             print(f"Notifinando a {peer.address}")
-            requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2)
+            requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2, **self.secure_args)
 
     
     def replicate_to_followers(self,wal):
         for peer in self.peers.values():
             data=wal.to_dict()
-            requests.post(f"http://{peer.address}/replicate",json=data ,timeout=2)
+            requests.post(f"https://{peer.address}/replicate",json=data ,timeout=2, **self.secure_args)
 
     
     
@@ -226,6 +229,10 @@ class ClusterContext:
         try:
             if msg["operation"] == "INSERT":
                 user = User(**msg["payload"])
+                
+                existing_user = session.query(User).filter_by(username=user.username).first()
+                if existing_user :    
+                    return
                 session.add(user)
 
             elif msg["operation"] == "UPDATE":
@@ -248,15 +255,18 @@ class ClusterContext:
 
         
     def sync_from_leader(self):
-        leader=self.peers[self.leader_id]
+        leader=self.peers[self.leader_id] # type: ignore
         res = requests.post( 
-            f"http://{leader.address}/sync",
-            json={"last_lsn": self.last_applied_lsn}
+            f"https://{leader.address}/sync",
+            json={"last_lsn": self.last_applied_lsn},
+            **self.secure_args
         )
 
         session=self.database.get_session()
         for entry in res.json():
-
+            existing_wal = session.query(WALLog).filter_by(lsn=entry["lsn"]).first()
+            if existing_wal:
+                continue
             wal = WALLog(
                 lsn=entry["lsn"],
                 operation=entry["operation"],

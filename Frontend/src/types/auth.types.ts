@@ -1,14 +1,19 @@
 // src/types/auth.types.ts
 
-export interface AuthResponse {
+export interface LoginResponse {
+        
     token: string;
-    user?: {
+    user: {
         id: string;
         username: string;
-    };
-    error?: string;
+        password: string;
+        dateCreated: string;
+    }
 }
-
+export interface AuthResponse {
+   userid?: string;
+   state?: number;
+}
 export interface LoginCredentials {
     username: string;
     password: string;
@@ -16,6 +21,5 @@ export interface LoginCredentials {
 
 export interface RegisterCredentials {
     username: string;
-    email: string;
     password: string;
 }

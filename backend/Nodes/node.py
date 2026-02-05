@@ -31,8 +31,10 @@ class Node:
 
             host_id= socket.gethostname()
             host=socket.gethostbyname(host_id)
-            
-            return host
+            print("Host encontrado:")
+            print(host_id)
+            print(host)
+            return host_id
         except:
             print("Fallo al enconcontrar host")
             return "falta_implementar"

@@ -60,7 +60,7 @@ class SecuritySetup:
         
         # SANs: Vitales para que los nodos se hablen entre sí por nombre de servicio o localhost
         san =   x509.SubjectAlternativeName([
-                x509.DNSName(f"node-{node_id}"),
+                x509.DNSName(f"node{node_id}.cluster_net"), # Nombre de servicio en Swarm
                 x509.DNSName("localhost"),
                 x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
     ])      
@@ -125,8 +125,8 @@ class SecuritySetup:
 
 if __name__ == "__main__":
     # Limpieza previa
-    if os.path.exists("deploy_certs"):
-        shutil.rmtree("deploy_certs")
+    if os.path.exists("/backend/deploy_certs"):
+        shutil.rmtree("/backend/deploy_certs")
     
     setup = SecuritySetup()
     setup.generate_ca()

@@ -1,9 +1,9 @@
 Buenísimo, aquí entramos ya en **optimización real de sistemas distribuidos** 😄
 Ahora mismo tu sistema **funciona**, pero hace cosas “caras”:
 
-* demasiados **307**
-* cada write puede dar **doble salto**
-* el user-service es **ingenuo** (no aprende quién es el líder)
+- demasiados **307**
+- cada write puede dar **doble salto**
+- el user-service es **ingenuo** (no aprende quién es el líder)
 
 Vamos a **optimizar redirects** sin romper nada de lo que ya hiciste.
 
@@ -31,10 +31,10 @@ Leader → OK
 
 Coste:
 
-* 2 requests
-* +latencia
-* +carga
-* +riesgo de timeout
+- 2 requests
+- +latencia
+- +carga
+- +riesgo de timeout
 
 ---
 
@@ -93,13 +93,13 @@ def cluster_write(method, path, json=None):
             leader = data.get("leader")
 
             if leader:
-                LEADER_CACHE["url"] = f"http://{leader}"
+                LEADER_CACHE["url"] = f"https://{leader}"
                 LEADER_CACHE["last_update"] = time.time()
 
                 # retry inmediato al líder
                 return requests.request(
                     method,
-                    f"http://{leader}{path}",
+                    f"https://{leader}{path}",
                     json=json,
                     timeout=3
                 )
@@ -153,12 +153,12 @@ Leader is down ❌
 
 Resultado:
 
-* timeout
-* excepción
-* cache se limpia
-* siguiente request va a cualquier nodo
-* follower responde con nuevo líder
-* cache se actualiza
+- timeout
+- excepción
+- cache se limpia
+- siguiente request va a cualquier nodo
+- follower responde con nuevo líder
+- cache se actualiza
 
 📌 **Failover transparente**
 
@@ -179,9 +179,9 @@ GET /users/<id>
 
 Eso:
 
-* escala
-* reduce carga
-* mejora disponibilidad
+- escala
+- reduce carga
+- mejora disponibilidad
 
 ---
 
@@ -198,10 +198,10 @@ Tu sistema ya está alineado con esto.
 
 Si quieres subir aún más el nivel:
 
-* header `X-Leader-Address`
-* sticky leader por request-id
-* backoff exponencial
-* métricas de redirect-rate
+- header `X-Leader-Address`
+- sticky leader por request-id
+- backoff exponencial
+- métricas de redirect-rate
 
 Pero **no lo necesitas para el proyecto académico**.
 

@@ -1,23 +1,26 @@
 // src/services/authService.ts
-import { AuthResponse, LoginCredentials, RegisterCredentials } from '../types/auth.types';
+import { AuthResponse,LoginResponse, LoginCredentials, RegisterCredentials } from '../types/auth.types';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:5001';
 
-async function authRequest(endpoint: string, data: object): Promise<AuthResponse> {
+async function authRequest(endpoint: string, data: object) {
     try {
-        const response = await fetch(`${API_URL}/auth/${endpoint}`, {
+        const response = await fetch(`${API_URL}/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
-
-        const result: AuthResponse = await response.json();
-
+        
         if (!response.ok) {
-            throw new Error(result.error || 'Error en el servidor');
+            throw new Error('Error en el servidor');
         }
-
+        
+        const result = await response.json();
+        
         return result;
+   
+
+        
     } catch (error: unknown) {
         console.error("Auth Error:", error);
         throw new Error((error as Error).message || 'Error de conexión con el Gateway');
@@ -26,7 +29,7 @@ async function authRequest(endpoint: string, data: object): Promise<AuthResponse
 
 export const authService = {
     login: async (creds: LoginCredentials) => {
-        const data = await authRequest('login', creds);
+        const data:LoginResponse= await authRequest('login', creds);
         if (data.token) {
             localStorage.setItem('jwt_token', data.token);
         }
@@ -34,7 +37,9 @@ export const authService = {
     },
 
     register: async (creds: RegisterCredentials) => {
-        return await authRequest('register', creds);
+        const data:AuthResponse = await authRequest('register', creds);
+        
+        return data.state;
     },
 
     logout: () => {

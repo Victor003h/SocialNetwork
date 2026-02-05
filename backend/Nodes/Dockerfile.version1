@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copiar dependencias primero (mejor cache)
-COPY requirements.txt .
+COPY ./Nodes/requirements.txt .
 
 # Instalar dependencias
 RUN pip install --no-cache-dir -r requirements.txt
@@ -22,9 +22,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el código del proyecto
 COPY . .
 
+ENV PYTHONPATH=/app
+
 RUN mkdir -p /app/certs
 # Exponer el puerto del nodo (control plane)
 EXPOSE 5000
 
 # Comando de arranque
-CMD ["python", "-m","main.py"]
+CMD ["python","./Nodes/main.py"]

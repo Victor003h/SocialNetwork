@@ -6,9 +6,9 @@ import jwt
 app = Flask(__name__)
 
 # URLs internas de los servicios
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:5001")
-USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:5002")
-POST_SERVICE_URL = os.getenv("POST_SERVICE_URL", "http://localhost:5003")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "https://localhost:5001")
+USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "https://localhost:5002")
+POST_SERVICE_URL = os.getenv("POST_SERVICE_URL", "https://localhost:5003")
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecretkey")
 

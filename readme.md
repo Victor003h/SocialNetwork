@@ -78,7 +78,7 @@ docker run  -d
 Node 2:
 
 ```bash
-docker run -d  \
+docker run   -d  \
             --name node2 \
             --hostname node-2
             --network cluster_net  \
@@ -108,7 +108,7 @@ docker logs -f node3
 En backend/services/auth
 
 ```bash
-docker build -t auth_service
+docker build -f Dockerfile -t auth_service
 
 ```
 
