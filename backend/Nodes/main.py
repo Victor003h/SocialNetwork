@@ -4,12 +4,13 @@ from flask import Flask, jsonify, redirect, request
 from requests import RequestException
 import os 
 import requests
-from sqlalchemy import create_engine, false
+from sqlalchemy import create_engine, false, select
 
 
 from Failure_Detector import FailureDetector
 from HeartbeatSender import HeartbeatSender
 
+from models.wal import WALLog
 from models.user import User
 from node import Node
 from cluster import ClusterContext
@@ -110,26 +111,228 @@ def create_app(cluster: ClusterContext) -> Flask:
         if redirect:
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         
+        lsn=cluster.next_lsn()
         data = request.json
+
+        
+        
         user = User(
             username=data["username"],
             password_hash=data["password"]
         )
+
+        wal=WALLog(
+            lsn=lsn,
+            operation="INSERT",
+            table_name="users",
+            payload=user.to_dict()
+        )
+
         session=cluster.database.get_session()
-        session.add(user)
+        session.add(user)    
+        session.add(wal)
         session.commit()
+        
+        cluster.replicate_to_followers(wal)
 
         return jsonify({"id": user.id}), 201
 
 
+    @app.route("/db/users", methods=["GET"])
+    def list_users():
+        redirect= False
+        if not cluster.local_node.is_leader():
+            leader_address=cluster.peers[cluster.leader_id].address
+            redirect=True
+            requests.get(f"http://{leader_address}/db/users" ,timeout=2)
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        if redirect:
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        
+
+
+
+
+        session = cluster.database.get_session()
+        try:
+            users = session.query(User).all()
+            return jsonify([u.to_dict() for u in users]), 200
+        finally:
+            session.close()
+
+
+
+    @app.route("/db/users/<int:user_id>", methods=["PUT"])
+    def update_user(user_id):
+        # if not cluster.local_node.is_leader():
+        #     leader_address = cluster.peers[cluster.leader_id].address
+        #     return jsonify({
+        #         "error": "not leader",
+        #         "leader": leader_address
+        #     }), 307
+
+        redirect= False
+        if not cluster.local_node.is_leader():
+            leader_address=cluster.peers[cluster.leader_id].address
+            redirect=True
+            requests.put(f"http://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2)
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        if redirect:
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        
+
+        data = request.json
+        session = cluster.database.get_session()
+
+        try:
+            user = session.get(User, user_id)
+            if not user:
+                return jsonify({"error": "user not found"}), 404
+
+            if "username" in data:
+                user.username = data["username"]
+            if "password" in data:
+                user.password_hash = data["password"]
+
+            lsn = cluster.next_lsn()
+
+            wal = WALLog(
+                lsn=lsn,
+                operation="UPDATE",
+                table_name="users",
+                payload={
+                    "id": user.id,
+                    "username": user.username,
+                    "password_hash": user.password_hash
+                }
+            )
+
+            session.add(wal)
+            session.commit()
+
+            cluster.replicate_to_followers(wal)
+
+            return jsonify({"status": "updated"}), 200
+
+        finally:
+            session.close()
+
+    @app.route("/db/users/<int:user_id>", methods=["DELETE"])
+    def delete_user(user_id):
+        # if not cluster.local_node.is_leader():
+        #     leader_address = cluster.peers[cluster.leader_id].address
+        #     return jsonify({
+        #         "error": "not leader",
+        #         "leader": leader_address
+        #     }), 307
+
+        redirect= False
+        if not cluster.local_node.is_leader():
+            leader_address=cluster.peers[cluster.leader_id].address
+            redirect=True
+            requests.delete(f"http://{leader_address}/db/users/{user_id}" ,timeout=2)
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        if redirect:
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+        
+
+        
+
+        session = cluster.database.get_session()
+
+        try:
+            user = session.get(User, user_id)
+            if not user:
+                print("user with id :{user_id} not found")
+                return jsonify({"error": f"user with id :{user_id} not found"}), 404
+
+            lsn = cluster.next_lsn()
+
+            wal = WALLog(
+                lsn=lsn,
+                operation="DELETE",
+                table_name="users",
+                payload={"id": user.id}
+            )
+
+            session.delete(user)
+            session.add(wal)
+            session.commit()
+
+            cluster.replicate_to_followers(wal)
+
+            return jsonify({"status": "deleted"}), 200
+
+        finally:
+            session.close()
+
+
+
+    @app.route("/replicate", methods=["POST"])
+    def replicate():
+        msg = request.json
+        lsn = msg["lsn"]
+
+        # Idempotencia
+        if lsn <= cluster.last_applied_lsn:
+            return {"status": "ignored"}, 200
+
+        session = cluster.database.get_session()
+
+        try:
+
+            wal = WALLog(
+                lsn=msg["lsn"],
+                operation=msg["operation"],
+                table_name=msg["table"],
+                payload=msg["payload"]
+            )
+            session.add(wal)
+
+ 
+            cluster.apply_operation(msg)
+
+            session.commit()
+
+            cluster.last_applied_lsn = lsn
+
+            return {"status": "ok"}, 200
+
+        except Exception as e:
+            session.rollback()
+            print(f"[REPLICATE] Error applying WAL {lsn}: {e}")
+            return {"error": "replication failed"}, 500
+
+        finally:
+            session.close()
+
+
+    @app.route("/sync", methods=["POST"])
+    def sync():
+        req = request.json
+        from_lsn = req["last_lsn"]
+        session= cluster.database.get_session()
+        
+        try:
+            stmt = (
+                select(WALLog)
+                .where(WALLog.lsn > from_lsn)
+                .order_by(WALLog.lsn)
+                
+            )
+
+            logs = session.execute(stmt).scalars().all()
+
+            return jsonify([log.to_dict() for log in logs]), 200
+
+        finally:
+            session.close()    
 
     return app
 
 
 def main():
     print("=== Starting DB Cluster Node ===")
-
-
 
 
     # -------------------------
@@ -159,6 +362,8 @@ def main():
     print("[DISCOVERY] Notifying my existence")
     cluster.Notify_existence()
 
+
+
     # -------------------------
     # 4. Nodo listo 
     # -------------------------
@@ -173,6 +378,11 @@ def main():
         
     else:
         print(f"Found Leader :{cluster.leader_id}")
+
+
+
+    if not cluster.local_node.is_leader():
+        cluster.sync_from_leader()
 
 
     if(cluster.local_node.is_leader()):
@@ -198,3 +408,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

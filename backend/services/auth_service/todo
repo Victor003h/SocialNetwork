@@ -1,0 +1,225 @@
+Buenísimo, aquí entramos ya en **optimización real de sistemas distribuidos** 😄
+Ahora mismo tu sistema **funciona**, pero hace cosas “caras”:
+
+* demasiados **307**
+* cada write puede dar **doble salto**
+* el user-service es **ingenuo** (no aprende quién es el líder)
+
+Vamos a **optimizar redirects** sin romper nada de lo que ya hiciste.
+
+---
+
+## 🎯 Objetivo
+
+1. **Reducir redirects 307**
+2. **Cachear el líder en user-service**
+3. **Reintentar automáticamente si el líder cae**
+4. **No acoplar user-service al cluster internamente**
+
+---
+
+## 1️⃣ Problema actual (flujo real)
+
+Ahora mismo pasa esto:
+
+```
+UserService → follower
+Follower → 307 (leader)
+UserService → leader
+Leader → OK
+```
+
+Coste:
+
+* 2 requests
+* +latencia
+* +carga
+* +riesgo de timeout
+
+---
+
+## 2️⃣ Idea clave: “leader hint”
+
+El cluster **ya sabe quién es el líder**, así que úsalo.
+
+### En el follower (DB Cluster)
+
+Cuando rediriges, **no solo devuelvas 307**, devuelve también el líder:
+
+```python
+return jsonify({
+    "redirect": True,
+    "leader": leader_address
+}), 307
+```
+
+---
+
+## 3️⃣ Cache de líder en user-service
+
+En **user-service** mantenemos esto:
+
+```python
+LEADER_CACHE = {
+    "url": None,
+    "last_update": 0
+}
+
+LEADER_TTL = 10  # segundos
+```
+
+---
+
+## 4️⃣ Función centralizada para writes (CLAVE)
+
+En lugar de llamar `requests.post` directo, haces esto:
+
+```python
+def cluster_write(method, path, json=None):
+    url = LEADER_CACHE["url"] or DB_CLUSTER_URL
+
+    try:
+        res = requests.request(
+            method,
+            f"{url}{path}",
+            json=json,
+            timeout=3,
+            allow_redirects=False
+        )
+
+        # 🚨 follower respondió
+        if res.status_code == 307:
+            data = res.json()
+            leader = data.get("leader")
+
+            if leader:
+                LEADER_CACHE["url"] = f"http://{leader}"
+                LEADER_CACHE["last_update"] = time.time()
+
+                # retry inmediato al líder
+                return requests.request(
+                    method,
+                    f"http://{leader}{path}",
+                    json=json,
+                    timeout=3
+                )
+
+        return res
+
+    except requests.RequestException:
+        # líder muerto → limpiar cache
+        LEADER_CACHE["url"] = None
+        raise
+```
+
+📌 **Esto elimina redirects futuros**
+
+---
+
+## 5️⃣ Uso en tus endpoints (ejemplo register)
+
+```python
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+
+    if not data.get("username") or not data.get("password"):
+        return jsonify({"error": "Faltan campos"}), 400
+
+    res = cluster_write(
+        "POST",
+        "/db/users",
+        json={
+            "username": data["username"],
+            "password": bcrypt.generate_password_hash(
+                data["password"]
+            ).decode("utf-8")
+        }
+    )
+
+    return jsonify(res.json()), res.status_code
+```
+
+---
+
+## 6️⃣ Qué pasa cuando el líder cae
+
+Escenario:
+
+```
+UserService → cached leader
+Leader is down ❌
+```
+
+Resultado:
+
+* timeout
+* excepción
+* cache se limpia
+* siguiente request va a cualquier nodo
+* follower responde con nuevo líder
+* cache se actualiza
+
+📌 **Failover transparente**
+
+---
+
+## 7️⃣ Reads (GET) no necesitan líder
+
+Muy importante:
+
+```python
+GET /users
+GET /users/<id>
+```
+
+👉 **NO cachees líder**
+👉 **NO fuerces líder**
+👉 **puede responder cualquier nodo**
+
+Eso:
+
+* escala
+* reduce carga
+* mejora disponibilidad
+
+---
+
+## 8️⃣ Regla de oro (memorízala)
+
+> **Writes → líder
+> Reads → cualquiera**
+
+Tu sistema ya está alineado con esto.
+
+---
+
+## 9️⃣ Opcional (nivel pro)
+
+Si quieres subir aún más el nivel:
+
+* header `X-Leader-Address`
+* sticky leader por request-id
+* backoff exponencial
+* métricas de redirect-rate
+
+Pero **no lo necesitas para el proyecto académico**.
+
+---
+
+## 10️⃣ Resumen claro
+
+✔ Eliminaste redirects repetidos
+✔ User-service aprende el líder
+✔ Failover automático
+✔ Menos latencia
+✔ Sin acoplamiento fuerte
+
+---
+
+Si quieres, el siguiente paso natural es:
+
+➡ **consistencia de lectura (read-your-writes)**
+➡ **versionado por LSN en respuestas**
+
+Dime y seguimos.

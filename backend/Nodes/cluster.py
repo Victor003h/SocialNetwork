@@ -1,14 +1,19 @@
+import select
 import socket
 from tarfile import data_filter
 import time
 from typing import Dict, List
 import os
+from flask import session
 import requests
 from sqlalchemy import Boolean
 
 from DataBase import Database
+
 from node import Node
 from security.Cert_Manager import CertManager
+from models.user import User
+from models.wal import WALLog
 
 
 class ClusterContext:
@@ -28,6 +33,7 @@ class ClusterContext:
 
         self.election_in_progress=False
         self.last_heartbeat = time.time()
+        self.last_applied_lsn=0
 
         self.database = Database()
         
@@ -196,4 +202,75 @@ class ClusterContext:
         for peer in self.peers.values():
             data=self.local_node.to_dict()
             print(f"Notifinando a {peer.address}")
-            requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2, **self.secure_args)
+            requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2)
+
+    
+    def replicate_to_followers(self,wal):
+        for peer in self.peers.values():
+            data=wal.to_dict()
+            requests.post(f"http://{peer.address}/replicate",json=data ,timeout=2)
+
+    
+    
+    # def apply_operation(self,msg):
+    #     if msg["operation"] == "INSERT" and msg["table"] == "users":
+    #         user = User(**msg["payload"])
+    #         session=self.database.get_session()
+    #         session.add(user)
+    #         session.commit()
+    
+
+    def apply_operation(self,msg):
+        session = self.database.get_session()
+
+        try:
+            if msg["operation"] == "INSERT":
+                user = User(**msg["payload"])
+                session.add(user)
+
+            elif msg["operation"] == "UPDATE":
+                user = session.get(User, msg["payload"]["id"])
+                if user:
+                    user.username = msg["payload"]["username"]
+                    user.password_hash = msg["payload"]["password_hash"]
+
+            elif msg["operation"] == "DELETE":
+                user = session.get(User, msg["payload"]["id"])
+                if user:
+                    session.delete(user)
+
+            session.commit()
+
+        finally:
+            session.close()
+
+
+
+        
+    def sync_from_leader(self):
+        leader=self.peers[self.leader_id]
+        res = requests.post( 
+            f"http://{leader.address}/sync",
+            json={"last_lsn": self.last_applied_lsn}
+        )
+
+        session=self.database.get_session()
+        for entry in res.json():
+
+            wal = WALLog(
+                lsn=entry["lsn"],
+                operation=entry["operation"],
+                table_name=entry["table"],
+                payload=entry["payload"]
+            )
+            session.add(wal)
+
+            self.apply_operation(entry)
+            self.last_applied_lsn = entry["lsn"]
+
+        session.commit()
+        session.close()
+
+    def next_lsn(self):
+        self.last_applied_lsn=self.last_applied_lsn+1
+        return self.last_applied_lsn
