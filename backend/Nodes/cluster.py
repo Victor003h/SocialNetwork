@@ -214,15 +214,6 @@ class ClusterContext:
             requests.post(f"https://{peer.address}/replicate",json=data ,timeout=2, **self.secure_args)
 
     
-    
-    # def apply_operation(self,msg):
-    #     if msg["operation"] == "INSERT" and msg["table"] == "users":
-    #         user = User(**msg["payload"])
-    #         session=self.database.get_session()
-    #         session.add(user)
-    #         session.commit()
-    
-
     def apply_operation(self,msg):
         session = self.database.get_session()
 
@@ -250,9 +241,6 @@ class ClusterContext:
 
         finally:
             session.close()
-
-
-
         
     def sync_from_leader(self):
         leader=self.peers[self.leader_id] # type: ignore
