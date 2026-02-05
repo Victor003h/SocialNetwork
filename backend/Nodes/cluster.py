@@ -1,3 +1,4 @@
+from multiprocessing import set_forkserver_preload
 import select
 from operator import add
 import select
@@ -8,7 +9,7 @@ from typing import Dict, List
 import os
 from flask import session
 import requests
-from sqlalchemy import Boolean
+from sqlalchemy import Boolean, false, func, text
 
 from DataBase import Database
 
@@ -35,8 +36,6 @@ class ClusterContext:
 
         self.election_in_progress=False
         self.last_heartbeat = time.time()
-        self.last_applied_lsn=0
-
         self.database = Database()
         
         self.security = CertManager(cert_dir='certs')
@@ -49,6 +48,23 @@ class ClusterContext:
             "verify": self.ca_path    # Contra qué valido a los demás
             
         }
+        #self.last_applied_lsn=0
+        self.database.create_tables()
+        
+ 
+        with self.database.engine.begin() as conn:
+            conn.execute(text("""
+                CREATE SEQUENCE IF NOT EXISTS users_id_seq;
+            """))
+
+
+        session=self.database.get_session()
+        self.last_applied_lsn = (
+        session.query(func.max(WALLog.lsn)).scalar() or 0
+        )
+
+        session.close()
+
     # -------------------------
     # Discovery
     # -------------------------
@@ -138,7 +154,7 @@ class ClusterContext:
         self.election_in_progress = True
         local_id = self.local_node.node_id
         higher_nodes = [
-            peer for peer in self.get_peers() if peer.node_id > local_id
+            peer for peer in self.get_peers() if (peer.node_id > local_id) and peer.alive
         ]
 
         print(f"[ELECTION] Node {local_id} starting election")
@@ -162,8 +178,22 @@ class ClusterContext:
 
         print(f"[LEADER] Node {node.node_id} became leader")
 
+        session = self.database.get_session()
+
+        session.execute(text("""
+            SELECT setval(
+                'users_id_seq',
+                (SELECT COALESCE(MAX(id), 0) FROM users)
+            )
+        """))
+
+        session.commit()
+        session.close()
+
+
         for peer in self.get_peers():
             try:
+                if not  peer.alive:continue
                 requests.post(
                     f"https://{peer.address}/leader",
                     json={"leader_id": node.node_id},
@@ -204,6 +234,7 @@ class ClusterContext:
 
     def Notify_existence(self):
         for peer in self.peers.values():
+            if not  peer.alive:continue
             data=self.local_node.to_dict()
             print(f"Notifinando a {peer.address}")
             requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2, **self.secure_args)
@@ -211,6 +242,7 @@ class ClusterContext:
     
     def replicate_to_followers(self,wal):
         for peer in self.peers.values():
+            if not  peer.alive:continue
             data=wal.to_dict()
             requests.post(f"https://{peer.address}/replicate",json=data ,timeout=2, **self.secure_args)
 
@@ -239,31 +271,45 @@ class ClusterContext:
 
         finally:
             session.close()
+
         
     def sync_from_leader(self):
-        leader=self.peers[self.leader_id] # type: ignore
-        res = requests.post( 
-            f"https://{leader.address}/sync",
+        leader = self.peers[self.leader_id] # type: ignore
+
+        res = requests.post(
+            f"http://{leader.address}/sync",
             json={"last_lsn": self.last_applied_lsn},
-            **self.secure_args
+            timeout=3
         )
 
-        session=self.database.get_session()
-        for entry in res.json():
-            wal = WALLog(
-                lsn=entry["lsn"],
-                operation=entry["operation"],
-                table_name=entry["table"],
-                payload=entry["payload"]
-            )
+        wal_entries = res.json()
+        if not wal_entries:
+            return
+
+        session = self.database.get_session()
+
+        for entry in wal_entries:
+            lsn = entry["lsn"]
+
+            # 🔐 defensa crítica: solo WAL nuevos
+            if lsn <= self.last_applied_lsn:
+                continue
+
+            wal = WALLog(**entry)
             session.add(wal)
 
             self.apply_operation(entry)
-            self.last_applied_lsn = entry["lsn"]
+            self.last_applied_lsn = lsn
 
         session.commit()
         session.close()
 
+
     def next_lsn(self):
         self.last_applied_lsn=self.last_applied_lsn+1
         return self.last_applied_lsn
+    
+    def mark_peer_down(self,peer):
+        self.peers[peer.node_id].alive=False
+
+    

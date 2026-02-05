@@ -1,6 +1,8 @@
+from datetime import datetime
 import threading
 import time
 from flask import Flask, jsonify, redirect, request
+from psycopg2 import Timestamp
 from requests import RequestException
 import os 
 import requests
@@ -79,6 +81,11 @@ def create_app(cluster: ClusterContext) -> Flask:
             service_name=data["service_name"],
             port=5000,
         )
+        if cluster.peers.__contains__(peer.node_id):
+            cluster.peers[peer.node_id].alive=True
+            print(f"[DISCOVERY] Node {peer.node_id} is back ")
+            return {"status":"ok"}
+
         peer.host =data["host"]
         peer.address = f"{data['host']}:5000"
         peer.alive=data["alive"]
@@ -114,22 +121,28 @@ def create_app(cluster: ClusterContext) -> Flask:
         lsn=cluster.next_lsn()
         data = request.json
 
-        
-        
+        session=cluster.database.get_session()
+        user_id=cluster.database.generate_user_id(session)
         user = User(
             username=data["username"],# type: ignore
-            password_hash=data["password"] # type: ignore
+            password_hash=data["password"], # type: ignore
+            id=user_id
         )
-
+        session.add(user) 
+         
         wal=WALLog(
+            wal_id=f"{cluster.local_node.node_id}:{lsn}",
+            node_id=cluster.local_node.node_id,
             lsn=lsn,
             operation="INSERT",
             table_name="users",
-            payload=user.to_dict()
-        )
+            entity_id=str(user.id),
+            payload=user.to_dict(),
+            timestamp=datetime.now()
+            )
 
-        session=cluster.database.get_session()
-        session.add(user)    
+       
+         
         session.add(wal)
         session.commit()
         
@@ -137,18 +150,16 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         return jsonify({"id": user.id}), 201
 
-
     @app.route("/db/users", methods=["GET"])
     def list_users():
         redirect= False
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address
+            leader_address=cluster.peers[cluster.leader_id].address # type: ignore
             redirect=True
             requests.get(f"http://{leader_address}/db/users" ,timeout=2)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
-            return jsonify({"msg":f"leader address: {leader_address}" }), 307
-        
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
 
 
 
@@ -159,8 +170,6 @@ def create_app(cluster: ClusterContext) -> Flask:
             return jsonify([u.to_dict() for u in users]), 200
         finally:
             session.close()
-
-
 
     @app.route("/db/users/<int:user_id>", methods=["PUT"])
     def update_user(user_id):
@@ -173,38 +182,40 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         redirect= False
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address
+            leader_address=cluster.peers[cluster.leader_id].address # type: ignore
             redirect=True
             requests.put(f"http://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
-            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
         
 
         data = request.json
         session = cluster.database.get_session()
+
 
         try:
             user = session.get(User, user_id)
             if not user:
                 return jsonify({"error": "user not found"}), 404
 
-            if "username" in data:
-                user.username = data["username"]
-            if "password" in data:
-                user.password_hash = data["password"]
+            if "username" in data: # type: ignore
+                user.username = data["username"]   # type: ignore
+            if "password" in data: # type: ignore
+                user.password_hash = data["password"] # type: ignore
 
             lsn = cluster.next_lsn()
 
-            wal = WALLog(
+
+            wal=WALLog(
+                wal_id=f"{cluster.local_node.node_id}:{lsn}",
+                node_id=cluster.local_node.node_id,
                 lsn=lsn,
                 operation="UPDATE",
                 table_name="users",
-                payload={
-                    "id": user.id,
-                    "username": user.username,
-                    "password_hash": user.password_hash
-                }
+                entity_id=str(user.id),
+                payload=user.to_dict(),
+                timestamp=datetime.now()
             )
 
             session.add(wal)
@@ -228,12 +239,12 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         redirect= False
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address
+            leader_address=cluster.peers[cluster.leader_id].address # type: ignore
             redirect=True
             requests.delete(f"http://{leader_address}/db/users/{user_id}" ,timeout=2)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
-            return jsonify({"msg":f"leader address: {leader_address}" }), 307
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
         
 
         
@@ -248,12 +259,17 @@ def create_app(cluster: ClusterContext) -> Flask:
 
             lsn = cluster.next_lsn()
 
-            wal = WALLog(
-                lsn=lsn,
-                operation="DELETE",
-                table_name="users",
-                payload={"id": user.id}
+            wal=WALLog(
+            wal_id=f"{cluster.local_node.node_id}:{lsn}",
+            node_id=cluster.local_node.node_id,
+            lsn=lsn,
+            operation="DELETE",
+            table_name="users",
+            entity_id=str(user.id),
+            payload=user.to_dict(),
+            timestamp=datetime.now()
             )
+
 
             session.delete(user)
             session.add(wal)
@@ -266,12 +282,10 @@ def create_app(cluster: ClusterContext) -> Flask:
         finally:
             session.close()
 
-
-
     @app.route("/replicate", methods=["POST"])
     def replicate():
         msg = request.json
-        lsn = msg["lsn"]
+        lsn = msg["lsn"] # type: ignore
 
         # Idempotencia
         if lsn <= cluster.last_applied_lsn:
@@ -281,12 +295,13 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         try:
 
-            wal = WALLog(
-                lsn=msg["lsn"],
-                operation=msg["operation"],
-                table_name=msg["table"],
-                payload=msg["payload"]
-            )
+            # wal = WALLog(
+            #     lsn=msg["lsn"],
+            #     operation=msg["operation"],
+            #     table_name=msg["table"],
+            #     payload=msg["payload"]
+            # )
+            wal = WALLog(**msg) # type: ignore
             session.add(wal)
 
  
@@ -310,7 +325,7 @@ def create_app(cluster: ClusterContext) -> Flask:
     @app.route("/sync", methods=["POST"])
     def sync():
         req = request.json
-        from_lsn = req["last_lsn"]
+        from_lsn = req["last_lsn"] # type: ignore
         session= cluster.database.get_session()
         
         try:
@@ -345,7 +360,7 @@ def main():
     # 2. Inicializar contexto de cluster
     # -------------------------
     cluster = ClusterContext(local_node)
-    cluster.database.create_tables()
+   # cluster.database.create_tables()
     print("[INIT] ClusterContext initialized")
 
     # -------------------------
@@ -378,7 +393,6 @@ def main():
         
     else:
         print(f"Found Leader :{cluster.leader_id}")
-
 
 
     if not cluster.local_node.is_leader():
