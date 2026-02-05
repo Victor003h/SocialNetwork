@@ -1,6 +1,8 @@
+from datetime import datetime
 import threading
 import time
 from flask import Flask, jsonify, redirect, request
+from psycopg2 import Timestamp
 from requests import RequestException
 import os 
 import requests
@@ -79,6 +81,11 @@ def create_app(cluster: ClusterContext) -> Flask:
             service_name=data["service_name"],
             port="5000",
         )
+        if cluster.peers.__contains__(peer.node_id):
+            cluster.peers[peer.node_id].alive=True
+            print(f"[DISCOVERY] Node {peer.node_id} is back ")
+            return {"status":"ok"}
+
         peer.host =data["host"]
         peer.address = f"{data['host']}:5000"
         peer.alive=data["alive"]
@@ -112,29 +119,34 @@ def create_app(cluster: ClusterContext) -> Flask:
         lsn=cluster.next_lsn()
         data = request.json
 
-        
-        
+        session=cluster.database.get_session()
+        user_id=cluster.database.generate_user_id(session)
         user = User(
+            id=user_id,
             username=data["username"],
             password_hash=data["password"]
         )
-
+        session.add(user) 
+         
         wal=WALLog(
+            wal_id=f"{cluster.local_node.node_id}:{lsn}",
+            node_id=cluster.local_node.node_id,
             lsn=lsn,
             operation="INSERT",
             table_name="users",
-            payload=user.to_dict()
-        )
+            entity_id=str(user.id),
+            payload=user.to_dict(),
+            timestamp=datetime.now()
+            )
 
-        session=cluster.database.get_session()
-        session.add(user)    
+       
+         
         session.add(wal)
         session.commit()
         
         cluster.replicate_to_followers(wal)
 
         return jsonify({"id": user.id}), 201
-
 
     @app.route("/db/users", methods=["GET"])
     def list_users():
@@ -158,8 +170,6 @@ def create_app(cluster: ClusterContext) -> Flask:
         finally:
             session.close()
 
-
-
     @app.route("/db/users/<int:user_id>", methods=["PUT"])
     def update_user(user_id):
         # if not cluster.local_node.is_leader():
@@ -182,6 +192,7 @@ def create_app(cluster: ClusterContext) -> Flask:
         data = request.json
         session = cluster.database.get_session()
 
+
         try:
             user = session.get(User, user_id)
             if not user:
@@ -194,15 +205,16 @@ def create_app(cluster: ClusterContext) -> Flask:
 
             lsn = cluster.next_lsn()
 
-            wal = WALLog(
+
+            wal=WALLog(
+                wal_id=f"{cluster.local_node.node_id}:{lsn}",
+                node_id=cluster.local_node.node_id,
                 lsn=lsn,
                 operation="UPDATE",
                 table_name="users",
-                payload={
-                    "id": user.id,
-                    "username": user.username,
-                    "password_hash": user.password_hash
-                }
+                entity_id=str(user.id),
+                payload=user.to_dict(),
+                timestamp=datetime.now()
             )
 
             session.add(wal)
@@ -246,12 +258,17 @@ def create_app(cluster: ClusterContext) -> Flask:
 
             lsn = cluster.next_lsn()
 
-            wal = WALLog(
-                lsn=lsn,
-                operation="DELETE",
-                table_name="users",
-                payload={"id": user.id}
+            wal=WALLog(
+            wal_id=f"{cluster.local_node.node_id}:{lsn}",
+            node_id=cluster.local_node.node_id,
+            lsn=lsn,
+            operation="DELETE",
+            table_name="users",
+            entity_id=str(user.id),
+            payload=user.to_dict(),
+            timestamp=datetime.now()
             )
+
 
             session.delete(user)
             session.add(wal)
@@ -263,8 +280,6 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         finally:
             session.close()
-
-
 
     @app.route("/replicate", methods=["POST"])
     def replicate():
@@ -279,12 +294,13 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         try:
 
-            wal = WALLog(
-                lsn=msg["lsn"],
-                operation=msg["operation"],
-                table_name=msg["table"],
-                payload=msg["payload"]
-            )
+            # wal = WALLog(
+            #     lsn=msg["lsn"],
+            #     operation=msg["operation"],
+            #     table_name=msg["table"],
+            #     payload=msg["payload"]
+            # )
+            wal = WALLog(**msg)
             session.add(wal)
 
  
@@ -343,7 +359,7 @@ def main():
     # 2. Inicializar contexto de cluster
     # -------------------------
     cluster = ClusterContext(local_node)
-    cluster.database.create_tables()
+   # cluster.database.create_tables()
     print("[INIT] ClusterContext initialized")
 
     # -------------------------
@@ -376,7 +392,6 @@ def main():
         
     else:
         print(f"Found Leader :{cluster.leader_id}")
-
 
 
     if not cluster.local_node.is_leader():

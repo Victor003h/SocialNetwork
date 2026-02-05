@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import os
 
@@ -31,3 +31,8 @@ class Database:
     def create_tables(self):
         Base.metadata.create_all(self.engine)
         
+    def generate_user_id(self, session):
+        result = session.execute(
+        text("SELECT nextval('users_id_seq')")
+        )
+        return result.scalar()

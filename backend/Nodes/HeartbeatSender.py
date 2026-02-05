@@ -7,13 +7,17 @@ from cluster import ClusterContext
 
 
 class HeartbeatSender:
-    def __init__(self, cluster:ClusterContext, interval=2):
+    def __init__(self, cluster, interval=2, timeout=6):
         self.cluster = cluster
         self.interval = interval
+        self.timeout = timeout  # tiempo máximo sin heartbeat
         self.running = False
 
+        # peer_id -> last_success_timestamp
+        self.last_seen = {}
+
     def start(self):
-        if self.running  :
+        if self.running:
             return
         self.running = True
         threading.Thread(target=self._loop, daemon=True).start()
@@ -22,24 +26,35 @@ class HeartbeatSender:
         self.running = False
 
     def _loop(self):
-        print(f"[HEARTBEAT] Node {self.cluster.local_node.node_id} starts sending heartbeat")
+        print(f"[HEARTBEAT] Node {self.cluster.local_node.node_id} started")
+
         while self.running:
-         
             if not self.cluster.local_node.is_leader():
                 time.sleep(self.interval)
                 continue
 
-            for peer in self.cluster.get_peers():
-               
-                try:
-                    print(f"[HEARTBEAT] manda heartbeat a {peer.address}")
-                    print(peer.address)
-                    requests.post(f"http://{peer.address}/heartbeat",timeout=1)
-                    print(f"[HEARTBEAT] Sent to {peer.address}")
+            now = time.time()
 
-                except Exception as e:
-                    print(f"[HEARTBEAT] fallo al mandar heartbeat a  {peer.address}")
-                    # no hacemos nada: fallo parcial permitido
-                    pass
+            for peer in self.cluster.get_peers():
+                
+                try:
+                    requests.post(
+                        f"http://{peer.address}/heartbeat",
+                        timeout=1
+                    )
+
+                    # heartbeat OK
+                    self.last_seen[peer.node_id] = now
+                    if not peer.alive :
+                        self.cluster[peer.node_id].alive=True
+                        
+                except Exception:
+                    # no respuesta → se evalúa por timeout
+                    last = self.last_seen.get(peer.node_id)
+
+                    if last and (now - last) > self.timeout:
+                        print(f"[HEARTBEAT] Peer {peer.node_id} DOWN")
+                        self.cluster.mark_peer_down(peer)
 
             time.sleep(self.interval)
+
