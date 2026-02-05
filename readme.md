@@ -64,9 +64,10 @@ Node 1:
 ```bash
 docker run  -d
             --name node1 \
+            --hostname node-1\
             --network cluster_net \
             --network-alias cluster_net_serv \
-            -v $(pwd)/deploy_certs/node_1:/app/certs \
+            -v "$(pwd)/deploy_certs/node_1:/app/certs" \
             -e  NODE_ID=1 \
             -e NODE_PORT=5000 \
             -e POSTGRES_HOST=db1-postgres \
@@ -78,11 +79,12 @@ Node 2:
 
 ```bash
 docker run -d  \
-            --name node1 \
+            --name node2 \
+            --hostname node-2
             --network cluster_net  \
             --network-alias cluster_net_serv \
-            -v $(pwd)/deploy_certs/node_2:/app/certs \
-            -e  NODE_ID=1 \
+            -v "$(pwd)/deploy_certs/node_2:/app/certs" \
+            -e  NODE_ID=2 \
             -e NODE_PORT=5000 \
             -e POSTGRES_HOST=db2-postgres \
             -e SERVICE_NAME=cl_service   db_cluster_node

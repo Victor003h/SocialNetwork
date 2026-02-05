@@ -1,7 +1,7 @@
 import threading
 import time
 
-from cluster import ClusterContext
+from backend.Nodes.cluster import ClusterContext
 
 
 class FailureDetector:
