@@ -93,13 +93,13 @@ def cluster_write(method, path, json=None):
             leader = data.get("leader")
 
             if leader:
-                LEADER_CACHE["url"] = f"https://{leader}"
+                LEADER_CACHE["url"] = f"http://{leader}"
                 LEADER_CACHE["last_update"] = time.time()
 
                 # retry inmediato al líder
                 return requests.request(
                     method,
-                    f"https://{leader}{path}",
+                    f"http://{leader}{path}",
                     json=json,
                     timeout=3
                 )

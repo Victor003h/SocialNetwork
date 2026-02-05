@@ -1,3 +1,4 @@
+import select
 from operator import add
 import select
 import socket
@@ -213,17 +214,14 @@ class ClusterContext:
             data=wal.to_dict()
             requests.post(f"https://{peer.address}/replicate",json=data ,timeout=2, **self.secure_args)
 
-    
+  
+
     def apply_operation(self,msg):
         session = self.database.get_session()
 
         try:
             if msg["operation"] == "INSERT":
                 user = User(**msg["payload"])
-                
-                existing_user = session.query(User).filter_by(username=user.username).first()
-                if existing_user :    
-                    return
                 session.add(user)
 
             elif msg["operation"] == "UPDATE":
@@ -252,9 +250,6 @@ class ClusterContext:
 
         session=self.database.get_session()
         for entry in res.json():
-            existing_wal = session.query(WALLog).filter_by(lsn=entry["lsn"]).first()
-            if existing_wal:
-                continue
             wal = WALLog(
                 lsn=entry["lsn"],
                 operation=entry["operation"],

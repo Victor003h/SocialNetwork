@@ -106,6 +106,28 @@ def register():
     res.raise_for_status()
     return res.json()
 
+@app.route("/register", methods=["POST"])
+def register():
+
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+#     data = request.get_json()
+#     username = data.get("username")
+#     password = data.get("password")
+
+    res = requests.post(
+        f"{DB_CLUSTER_URL}/db/users",
+        json={
+            "username": username,
+            "password": bcrypt.generate_password_hash(password).decode("utf-8")
+        },
+        timeout=3
+    )
+    res.raise_for_status()
+    return res.json()
+
 ############################# esto debe de ir en servicio de usuario######### 
 @app.route("/users", methods=["GET"])
 def list_users():
@@ -200,6 +222,8 @@ def check():
 #     user = User(username=username, password_hash=hashed)
 #     db.session.add(user)
 #     db.session.commit()
+
+#     return jsonify({"message": "Usuario registrado correctamente"}), 201
 
 #     return jsonify({"message": "Usuario registrado correctamente"}), 201
 

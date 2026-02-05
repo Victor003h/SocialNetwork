@@ -142,12 +142,12 @@ def create_app(cluster: ClusterContext) -> Flask:
     def list_users():
         redirect= False
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address# type: ignore
+            leader_address=cluster.peers[cluster.leader_id].address
             redirect=True
-            requests.get(f"https://{leader_address}/db/users" ,timeout=2, **cluster.secure_args)
+            requests.get(f"http://{leader_address}/db/users" ,timeout=2)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
-            return jsonify({"msg":f"leader address: {leader_address}" }), 307# type: ignore
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
         
 
 
@@ -173,12 +173,12 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         redirect= False
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address # type: ignore
+            leader_address=cluster.peers[cluster.leader_id].address
             redirect=True
-            requests.put(f"https://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2, **cluster.secure_args)
+            requests.put(f"http://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
-            return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
         
 
         data = request.json
@@ -189,10 +189,10 @@ def create_app(cluster: ClusterContext) -> Flask:
             if not user:
                 return jsonify({"error": "user not found"}), 404
 
-            if "username" in data: # type: ignore
-                user.username = data["username"]# type: ignore
-            if "password" in data: # type: ignore
-                user.password_hash = data["password"] # type: ignore
+            if "username" in data:
+                user.username = data["username"]
+            if "password" in data:
+                user.password_hash = data["password"]
 
             lsn = cluster.next_lsn()
 
@@ -228,12 +228,12 @@ def create_app(cluster: ClusterContext) -> Flask:
 
         redirect= False
         if not cluster.local_node.is_leader():
-            leader_address=cluster.peers[cluster.leader_id].address # type: ignore
+            leader_address=cluster.peers[cluster.leader_id].address
             redirect=True
-            requests.delete(f"https://{leader_address}/db/users/{user_id}" ,timeout=2, **cluster.secure_args)
+            requests.delete(f"http://{leader_address}/db/users/{user_id}" ,timeout=2)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
-            return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+            return jsonify({"msg":f"leader address: {leader_address}" }), 307
         
 
         
@@ -270,8 +270,8 @@ def create_app(cluster: ClusterContext) -> Flask:
 
     @app.route("/replicate", methods=["POST"])
     def replicate():
-        msg = request.json 
-        lsn = msg["lsn"] # type: ignore
+        msg = request.json
+        lsn = msg["lsn"]
 
         # Idempotencia
         if lsn <= cluster.last_applied_lsn:
@@ -282,10 +282,10 @@ def create_app(cluster: ClusterContext) -> Flask:
         try:
 
             wal = WALLog(
-                lsn=msg["lsn"], # type: ignore
-                operation=msg["operation"],# type: ignore
-                table_name=msg["table"],# type: ignore
-                payload=msg["payload"] # type: ignore
+                lsn=msg["lsn"],
+                operation=msg["operation"],
+                table_name=msg["table"],
+                payload=msg["payload"]
             )
             session.add(wal)
 
@@ -310,7 +310,7 @@ def create_app(cluster: ClusterContext) -> Flask:
     @app.route("/sync", methods=["POST"])
     def sync():
         req = request.json
-        from_lsn = req["last_lsn"] # type: ignore
+        from_lsn = req["last_lsn"]
         session= cluster.database.get_session()
         
         try:
