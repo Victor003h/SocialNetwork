@@ -166,6 +166,104 @@ def check():
 #     if not username or not password:
 #         return jsonify({"error": "Faltan campos"}), 400
 
+    res = requests.post(
+        f"{DB_CLUSTER_URL}/db/users",
+        json={
+            "username": username,
+            "password": bcrypt.generate_password_hash(password).decode("utf-8")
+        },
+        timeout=3
+    )
+    res.raise_for_status()
+    return res.json()
+
+############################# esto debe de ir en servicio de usuario######### 
+@app.route("/users", methods=["GET"])
+def list_users():
+    try:
+        res = requests.get(
+            f"{DB_CLUSTER_URL}/db/users",
+            timeout=3
+        )
+        return jsonify(res.json()), res.status_code
+
+    except requests.RequestException:
+        return jsonify({"error": "DB cluster unavailable"}), 503
+
+
+@app.route("/users/<int:user_id>", methods=["GET"])
+def get_user(user_id):
+    try:
+        res = requests.get(
+            f"{DB_CLUSTER_URL}/db/users/{user_id}",
+            timeout=3
+        )
+        return jsonify(res.json()), res.status_code
+
+    except requests.RequestException:
+        return jsonify({"error": "DB cluster unavailable"}), 503
+
+
+@app.route("/users/<int:user_id>", methods=["PUT"])
+def update_user(user_id):
+    data = request.get_json()
+
+    payload = {}
+    if "username" in data:
+        payload["username"] = data["username"]
+    if "password" in data:
+        payload["password"] = bcrypt.generate_password_hash(
+            data["password"]
+        ).decode("utf-8")
+
+    if not payload:
+        return jsonify({"error": "No hay campos para actualizar"}), 400
+
+    try:
+        res = requests.put(
+            f"{DB_CLUSTER_URL}/db/users/{user_id}",
+            json=payload,
+            timeout=3
+        )
+        return jsonify(res.json()), res.status_code
+
+    except requests.RequestException:
+        return jsonify({"error": "DB cluster unavailable"}), 503
+
+
+@app.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    try:
+        res = requests.delete(
+            f"{DB_CLUSTER_URL}/db/users/{user_id}",
+            timeout=3
+        )
+        return jsonify(res.json()), res.status_code
+
+    except requests.RequestException:
+        return jsonify({"error": "DB cluster unavailable"}), 503
+
+
+
+
+#############################
+
+
+@app.route("/check",methods=["GET"])
+def check():
+    return jsonify({"message": "todo bien"}), 201
+
+#  Registrar usuario
+# @app.route("/register", methods=["POST"])
+# def register():
+
+#     data = request.get_json()
+#     username = data.get("username")
+#     password = data.get("password")
+
+#     if not username or not password:
+#         return jsonify({"error": "Faltan campos"}), 400
+
 #     if User.query.filter_by(username=username).first():
 #         return jsonify({"error": "Usuario ya existe"}), 409
 
