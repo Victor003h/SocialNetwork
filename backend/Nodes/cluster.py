@@ -277,9 +277,10 @@ class ClusterContext:
         leader = self.peers[self.leader_id] # type: ignore
 
         res = requests.post(
-            f"http://{leader.address}/sync",
+            f"https://{leader.address}/sync",
             json={"last_lsn": self.last_applied_lsn},
-            timeout=3
+            timeout=3,
+            **self.secure_args
         )
 
         wal_entries = res.json()

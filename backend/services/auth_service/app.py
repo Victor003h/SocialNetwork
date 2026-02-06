@@ -52,60 +52,6 @@ def conected():
     res.raise_for_status()
     return res.json()
 
-
-@app.route("/register", methods=["POST"])
-def register():
-
-    data = request.get_json()
-    username = data.get("username")
-    password = data.get("password")
-
-    if not username or not password:
-        return jsonify({"error": "Faltan campos"}), 400
-
-    res = requests.post(
-        f"{DB_CLUSTER_URL}/db/users",
-        json={
-            "username": username,
-            "password": bcrypt.generate_password_hash(password).decode("utf-8")
-        },
-        timeout=3,
-        **secure_args
-    )
-    res.raise_for_status()
-    return res.json()
-
-
-
-
-
-
-
-#############################
-
-
-#  Registrar usuario
-# @app.route("/register", methods=["POST"])
-# def register():
-
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
-
-#     if not username or not password:
-#         return jsonify({"error": "Faltan campos"}), 400
-
-    res = requests.post(
-        f"{DB_CLUSTER_URL}/db/users",
-        json={
-            "username": username,
-            "password": bcrypt.generate_password_hash(password).decode("utf-8")
-        },
-        timeout=3
-    )
-    res.raise_for_status()
-    return res.json()
-
 @app.route("/register", methods=["POST"])
 def register():
 
@@ -203,29 +149,6 @@ def delete_user(user_id):
 @app.route("/check",methods=["GET"])
 def check():
     return jsonify({"message": "todo bien"}), 201
-
-#  Registrar usuario
-# @app.route("/register", methods=["POST"])
-# def register():
-
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
-
-#     if not username or not password:
-#         return jsonify({"error": "Faltan campos"}), 400
-
-#     if User.query.filter_by(username=username).first():
-#         return jsonify({"error": "Usuario ya existe"}), 409
-
-#     hashed = bcrypt.generate_password_hash(password).decode("utf-8")
-#     user = User(username=username, password_hash=hashed)
-#     db.session.add(user)
-#     db.session.commit()
-
-#     return jsonify({"message": "Usuario registrado correctamente"}), 201
-
-#     return jsonify({"message": "Usuario registrado correctamente"}), 201
 
 #  Login
 @app.route("/login", methods=["POST"])

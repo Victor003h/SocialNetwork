@@ -156,7 +156,7 @@ def create_app(cluster: ClusterContext) -> Flask:
         if not cluster.local_node.is_leader():
             leader_address=cluster.peers[cluster.leader_id].address # type: ignore
             redirect=True
-            requests.get(f"http://{leader_address}/db/users" ,timeout=2)
+            requests.get(f"https://{leader_address}/db/users" ,timeout=2, **cluster.secure_args)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
             return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
@@ -184,7 +184,7 @@ def create_app(cluster: ClusterContext) -> Flask:
         if not cluster.local_node.is_leader():
             leader_address=cluster.peers[cluster.leader_id].address # type: ignore
             redirect=True
-            requests.put(f"http://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2)
+            requests.put(f"https://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2, **cluster.secure_args)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
             return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
@@ -241,7 +241,7 @@ def create_app(cluster: ClusterContext) -> Flask:
         if not cluster.local_node.is_leader():
             leader_address=cluster.peers[cluster.leader_id].address # type: ignore
             redirect=True
-            requests.delete(f"http://{leader_address}/db/users/{user_id}" ,timeout=2)
+            requests.delete(f"https://{leader_address}/db/users/{user_id}" ,timeout=2, **cluster.secure_args)
             return jsonify({"msg":f"leader address: {leader_address}" }), 307
         if redirect:
             return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
