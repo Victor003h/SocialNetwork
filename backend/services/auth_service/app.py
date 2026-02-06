@@ -41,36 +41,95 @@ def get_db_url():
   host,_,_ = socket.gethostbyaddr(addres[0])
   return f"https://{host}:5000"
 
-DB_CLUSTER_URL= get_db_url()
-    
-
-@app.route("/conected",methods=["GET"])
-def conected():
+def get_leader_address():
+    db_cluster_alias=get_db_url()
     res = requests.get(
-    f"{DB_CLUSTER_URL}/info", timeout=3)
+        f"{db_cluster_alias}/db/leader_address",
+        timeout=3,
+        **secure_args
+    )
+    address=res.json().get("leader_address")
+    url=f"https://{address}"
+    print (f"DB Leader Address: {url}")
     
-    res.raise_for_status()
-    return res.json()
+    return url
+
+DB_LEADER_ADDRESS = get_leader_address()
+
+def call_cluster(method, endpoint, **kwargs):
+    """
+    Helper que realiza peticiones al cluster. 
+    Si falla, intenta buscar al nuevo líder y reintenta la operación.
+    """
+    global DB_LEADER_ADDRESS
+    
+    # Fusionar los argumentos de seguridad
+    request_kwargs = {**secure_args, **kwargs}
+
+    try:
+        if not DB_LEADER_ADDRESS:
+            raise Exception("Dirección del líder no disponible")
+            
+        url = f"{DB_LEADER_ADDRESS}{endpoint}"
+        print(f"[CLUSTER-CALL] {method} a {url}")
+        res = requests.request(method, url, **request_kwargs)
+        res.raise_for_status()
+        return res
+    except (requests.exceptions.RequestException, Exception) as e:
+        print(f"[CLUSTER-CALL] Fallo con el líder {DB_LEADER_ADDRESS}: {e}")
+        print("[CLUSTER-CALL] Reintentando descubrimiento de líder...")
+        
+        # Intentar refrescar la dirección
+        new_address = get_leader_address()
+        if new_address:
+            DB_LEADER_ADDRESS = new_address
+            url = f"{DB_LEADER_ADDRESS}{endpoint}"
+            print(f"[CLUSTER-CALL] Reintentando {method} a {url}")
+            res = requests.request(method, url, **request_kwargs)
+            res.raise_for_status()
+            return res
+        else:
+            raise Exception("No se pudo encontrar un líder disponible en el cluster.")
+        
+        
 
 @app.route("/register", methods=["POST"])
 def register():
-
+    print("Petición de registro recibida")
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
 
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
 
-    res = requests.post(
-        f"{DB_CLUSTER_URL}/db/users",
-        json={
+    if not username or not password:
+        return jsonify({"error": "Faltan campos"}), 400
+
+    try:
+        # Encriptamos la contraseña antes de enviarla al cluster
+        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+        print(f"Hashed password for {username}: {hashed_password}")
+        payload = {
             "username": username,
-            "password": bcrypt.generate_password_hash(password).decode("utf-8")
-        },
-        timeout=3
-    )
+            "password": hashed_password,
+            "created_at": datetime.datetime.now().isoformat()
+        }
+
+        # Enviamos la petición de creación al cluster (vía helper con reintento)
+        res = call_cluster("POST", "/db/users", json=payload)
+        print(f"Usuario {username} registrado con éxito en el cluster")
+        return jsonify({"message": "Usuario registrado correctamente en el cluster"}), 201
+
+    except Exception as e:
+        return jsonify({"error": "Error al registrar usuario", "details": str(e)}), 500
+    
+    
+     
+
+@app.route("/conected",methods=["GET"])
+def conected():
+    res = requests.get(
+    f"{DB_LEADER_ADDRESS}/info", timeout=3, **secure_args)
+    
     res.raise_for_status()
     return res.json()
 
@@ -79,8 +138,9 @@ def register():
 def list_users():
     try:
         res = requests.get(
-            f"{DB_CLUSTER_URL}/db/users",
-            timeout=3
+            f"{DB_LEADER_ADDRESS}/db/users",
+            timeout=3,
+            **secure_args
         )
         return jsonify(res.json()), res.status_code
 
@@ -92,8 +152,9 @@ def list_users():
 def get_user(user_id):
     try:
         res = requests.get(
-            f"{DB_CLUSTER_URL}/db/users/{user_id}",
-            timeout=3
+            f"{DB_LEADER_ADDRESS}/db/users/{user_id}",
+            timeout=3,
+            **secure_args
         )
         return jsonify(res.json()), res.status_code
 
@@ -118,9 +179,10 @@ def update_user(user_id):
 
     try:
         res = requests.put(
-            f"{DB_CLUSTER_URL}/db/users/{user_id}",
+            f"{DB_LEADER_ADDRESS}/db/users/{user_id}",
             json=payload,
-            timeout=3
+            timeout=3,
+            **secure_args
         )
         return jsonify(res.json()), res.status_code
 
@@ -132,8 +194,9 @@ def update_user(user_id):
 def delete_user(user_id):
     try:
         res = requests.delete(
-            f"{DB_CLUSTER_URL}/db/users/{user_id}",
-            timeout=3
+            f"{DB_LEADER_ADDRESS}/db/users/{user_id}",
+            timeout=3,
+            **secure_args
         )
         return jsonify(res.json()), res.status_code
 
@@ -157,38 +220,34 @@ def login():
     username = data.get("username")
     password = data.get("password")
 
-    # 1. En lugar de User.query, pedimos el usuario al Cluster
     try:
-        # Nota: Asumiendo que tu cluster tiene un endpoint para buscar por username
-        # o puedes usar el listado de usuarios para validar.
-        res = requests.get(
-            f"{DB_CLUSTER_URL}/db/users", 
-            timeout=3,
-            **secure_args
-        )
-        res.raise_for_status()
+        # Obtenemos los usuarios del cluster (vía helper con reintento)
+        res = call_cluster("GET", "/db/users")
         users = res.json()
         
-        # 2. Buscamos al usuario manualmente en la respuesta del cluster
+        # Buscamos al usuario en la lista devuelta por el cluster
         user_data = next((u for u in users if u['username'] == username), None)
 
         if not user_data or not bcrypt.check_password_hash(user_data['password_hash'], password):
             return jsonify({"error": "Credenciales incorrectas"}), 401
 
-        # 3. Generamos el token con los datos que nos dio el Cluster
+        # Generación del JWT
         token = jwt.encode({
-            "user_id": user_data['id'],
+            "user_id": user_data.get('id'),
             "username": user_data['username'],
             "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=48)
         }, JWT_SECRET, algorithm="HS256")
-        print("Generated JWT:", token)
-        return jsonify({"access_token": token, "user": user_data}), 200
+        
+        return jsonify({
+            "access_token": token, 
+            "user": {
+                "id": user_data.get('id'),
+                "username": user_data['username']
+            }
+        }), 200
 
     except Exception as e:
-        return jsonify({"error": f"Error conectando al DB Cluster: {str(e)}"}), 500
-    
-
-
+        return jsonify({"error": "Error conectando al cluster", "details": str(e)}), 500
 
 @app.route("/")
 def index():

@@ -62,13 +62,13 @@ A cada nodo le correspode un POSTGRES_HOST
 Node 1:
 
 ```bash
-docker run  -d
+docker run  -d \
             --name node1 \
-            --hostname node-1\
+            --hostname node1.cluster_net\
             --network cluster_net \
             --network-alias cluster_net_serv \
             -v "$(pwd)/deploy_certs/node_1:/app/certs" \
-            -e  NODE_ID=1 \
+            -e NODE_ID=1 \
             -e NODE_PORT=5000 \
             -e POSTGRES_HOST=db1-postgres \
             -e SERVICE_NAME=cl_service   db_cluster_node
@@ -80,11 +80,11 @@ Node 2:
 ```bash
 docker run   -d  \
             --name node2 \
-            --hostname node-2
+            --hostname node2.cluster_net
             --network cluster_net  \
             --network-alias cluster_net_serv \
             -v "$(pwd)/deploy_certs/node_2:/app/certs" \
-            -e  NODE_ID=2 \
+            -e NODE_ID=2 \
             -e NODE_PORT=5000 \
             -e POSTGRES_HOST=db2-postgres \
             -e SERVICE_NAME=cl_service   db_cluster_node
@@ -113,6 +113,17 @@ docker build -f Dockerfile -t auth_service
 ```
 
 ```bash
-docker run -d   --name auth_service  -p 5001:5001   -e POSTGRES_USER=admin   -e POSTGRES_PASSWORD=secret   -e POSTGRES_DB=auth_db   -e DB_HOST=172.17.0.1   -e DB_PORT=5433   -e JWT_SECRET_KEY=supersecretkey   auth_service
+docker run  -d  \
+            --name auth_service \
+            --hostname node4.cluster_net \
+            --network cluster_net \
+            -v "$(pwd)/deploy_certs/node_4:/app/certs" \
+            -p 5001:5001  \
+            -e POSTGRES_USER=admin \
+            -e POSTGRES_PASSWORD=secret \
+            -e POSTGRES_DB=auth_db \
+            -e DB_HOST=172.17.0.1 \
+            -e DB_PORT=5433  \
+            -e JWT_SECRET_KEY=supersecretkey   auth_service
 
 ```

@@ -55,6 +55,18 @@ def create_app(cluster: ClusterContext) -> Flask:
         return response, 200
 
     
+    @app.route("/db/leader_address", methods=["GET"])
+    def get_leader_address():
+        if cluster.leader_id :
+            if cluster.leader_id==cluster.local_node.node_id:
+                leader_address = cluster.local_node.address # type: ignore
+            else:
+                leader_address = cluster.peers[cluster.leader_id].address # type: ignore
+            return jsonify({"leader_address": leader_address}), 200
+        else:
+            return jsonify({"error": "Leader not found"}), 404
+    
+    
     @app.route("/leader", methods=["POST"])
     def leader_announcement():
         data=request.json

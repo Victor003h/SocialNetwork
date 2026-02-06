@@ -10,20 +10,30 @@ async function authRequest(endpoint: string, data: object) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
-        
-        if (!response.ok) {
-            throw new Error('Error en el servidor');
-        }
-        
-        const result = await response.json();
-        
-        return result;
-   
 
-        
+        // Si la respuesta no es 2xx (por ejemplo 503)
+        if (!response.ok) {
+            let errorMessage = `Error ${response.status}`;
+            try {
+                // Intentamos leer el JSON de error que enviamos desde Flask
+                const errorData = await response.json();
+                // Si Flask mandó {"error": "...", "details": "..."}, lo usamos
+                errorMessage = errorData.details || errorData.error || errorMessage;
+            } catch (e ) {
+                // Si no es un JSON, usamos el texto plano
+                const textError = await response.text();
+                errorMessage = textError || errorMessage;
+            }
+            throw new Error(errorMessage);
+        }
+
+        return await response.json();
+
     } catch (error: unknown) {
         console.error("Auth Error:", error);
-        throw new Error((error as Error).message || 'Error de conexión con el Gateway');
+        // Re-lanzamos el error para que el componente UI lo capture
+        if (error instanceof Error) throw error;
+        throw new Error('Error de conexión con el servidor');
     }
 }
 
