@@ -304,3 +304,64 @@ class ClusterContext:
         self.peers[peer.node_id].alive=False
 
     
+    def merge_wal(self, remote_wals):
+        session = self.database.get_session()
+
+        for wal_data in remote_wals:
+            exists = session.query(WALLog).filter_by(
+                wal_id=wal_data["wal_id"]
+            ).first()
+
+            if not exists:
+                wal = WALLog(**wal_data)
+                wal.applied = False
+                session.add(wal)
+
+        session.commit()
+
+
+        all_wals = session.query(WALLog).all()
+
+        all_wals.sort(
+            key=lambda w: (w.timestamp, w.node_id)
+        )
+
+
+        last_ts = {}  # (table, entity_id) -> timestamp
+
+        for wal in all_wals:
+            key = (wal.table_name, wal.entity_id)
+
+            if wal.applied:
+                last_ts[key] = wal.timestamp
+                continue
+
+            if key not in last_ts or wal.timestamp >= last_ts[key]:
+                self.apply_wal(wal)
+                wal.applied = True
+                last_ts[key] = wal.timestamp
+            else:
+                # WAL viejo, se ignora
+                wal.applied = True
+
+        session.commit()
+
+
+    def elect_final_leader(self):
+        alive_nodes = [
+            n for n in self.peers.values()
+            if n.alive
+        ] + [self.local_node]
+
+        leader = min(alive_nodes, key=lambda n: n.node_id)
+
+        self.leader_id = leader.node_id
+        self.local_node.set_role(
+            "leader" if leader.node_id == self.local_node.node_id else "follower"
+        )
+
+        print(f"[MERGE] Final leader elected: {leader.node_id}")
+
+
+
+

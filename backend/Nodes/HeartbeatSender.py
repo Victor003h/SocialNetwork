@@ -36,7 +36,7 @@ class HeartbeatSender:
             now = time.time()
 
             for peer in self.cluster.get_peers():
-                
+                if not peer.alive :continue
                 try:
                     requests.post(
                         f"http://{peer.address}/heartbeat",
@@ -45,8 +45,9 @@ class HeartbeatSender:
 
                     # heartbeat OK
                     self.last_seen[peer.node_id] = now
-                    if not peer.alive :
-                        self.cluster[peer.node_id].alive=True
+                    if peer.role=="leader":
+                        pass
+                    
                         
                 except Exception:
                     # no respuesta → se evalúa por timeout
