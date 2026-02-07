@@ -1,9 +1,9 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, func
 from sqlalchemy.orm import sessionmaker
 import os
 
 from models.user import Base
-
+from models.wal import WALLog
 
 
 class Database:
@@ -25,6 +25,24 @@ class Database:
 
         return f"postgresql://{user}:{password}@{host}:{port}/{name}"
 
+    def setupDatabase(self):
+        self.create_tables()
+        Table_List=["users","posts"]
+        with self.engine.begin() as conn:
+            for table in Table_List:
+                conn.execute(text(f"""
+                    CREATE SEQUENCE IF NOT EXISTS {table}_id_seq;
+                """))
+            
+            
+
+        session=self.get_session()
+        self.last_applied_lsn = (
+        session.query(func.max(WALLog.lsn)).scalar() or 0
+        )
+
+        session.close()
+    
     def get_session(self):
         return self.SessionLocal()
 
@@ -34,5 +52,11 @@ class Database:
     def generate_user_id(self, session):
         result = session.execute(
         text("SELECT nextval('users_id_seq')")
+        )
+        return result.scalar()
+    
+    def generate_post_id(self, session):
+        result = session.execute(
+        text("SELECT nextval('posts_id_seq')")
         )
         return result.scalar()

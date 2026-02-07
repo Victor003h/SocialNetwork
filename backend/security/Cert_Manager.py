@@ -16,6 +16,16 @@ class CertManager:
         
         self._validate_deployment()
 
+    def setupCerts(self):
+        
+        (self.cert_path, self.key_path), self.ca_path = self.get_context()
+        
+        # Definimos los argumentos estándar para requests seguros
+        secure_args = {
+            "cert": (self.cert_path, self.key_path), # Mi carta de presentación
+            "verify": self.ca_path    # Contra qué valido a los demás
+        }
+        return secure_args   
     def _validate_deployment(self):
         """Verifica que el kit de seguridad exista."""
         missing = []

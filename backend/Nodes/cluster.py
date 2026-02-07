@@ -35,35 +35,19 @@ class ClusterContext:
         self.leader_id: int | None = None
 
         self.election_in_progress=False
+        
         self.last_heartbeat = time.time()
+        
         self.database = Database()
+        
+        self.database.setupDatabase()
         
         self.security = CertManager(cert_dir='certs')
         
-        (self.cert_path, self.key_path), self.ca_path = self.security.get_context()
-        
-        # Definimos los argumentos estándar para requests seguros
-        self.secure_args = {
-            "cert": (self.cert_path, self.key_path), # Mi carta de presentación
-            "verify": self.ca_path    # Contra qué valido a los demás
-            
-        }
-        #self.last_applied_lsn=0
-        self.database.create_tables()
-        
- 
-        with self.database.engine.begin() as conn:
-            conn.execute(text("""
-                CREATE SEQUENCE IF NOT EXISTS users_id_seq;
-            """))
-
-
-        session=self.database.get_session()
-        self.last_applied_lsn = (
-        session.query(func.max(WALLog.lsn)).scalar() or 0
-        )
-
-        session.close()
+        self.secure_args= self.security.setupCerts()
+    
+        self.last_applied_lsn=0
+       
 
     # -------------------------
     # Discovery

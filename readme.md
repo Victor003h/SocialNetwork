@@ -24,7 +24,7 @@ Actualmente el foco está en:
 Todos los contenedores **deben** estar en la misma red.
 
 ```bash
-docker network create cluster_net
+docker network create --driver overlay --attachable  cluster_net
 
 ```
 
@@ -80,7 +80,7 @@ Node 2:
 ```bash
 docker run   -d  \
             --name node2 \
-            --hostname node2.cluster_net
+            --hostname node2.cluster_net \
             --network cluster_net  \
             --network-alias cluster_net_serv \
             -v "$(pwd)/deploy_certs/node_2:/app/certs" \

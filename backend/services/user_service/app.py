@@ -1,74 +1,71 @@
+import requests
+
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-import os
-from model import User, db
+from flask_bcrypt import Bcrypt
 
+from model import User
+from db_config import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
 
-
+from services.utils import utils
+from security.Cert_Manager import CertManager
 
 app = Flask(__name__)
 
 
 app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"postgresql://{db.DB_USER}:{db.DB_PASSWORD}@{db.DB_HOST}:5432/{db.DB_NAME}"
+    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5432/{DB_NAME}"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+security = CertManager(cert_dir='certs')
+
+secure_args = security.setupCerts()
+
+bcrypt = Bcrypt(app)
 db = SQLAlchemy(app)
+tools = utils(secure_args)
 
 
-
-@app.route("/")
-def index():
-    return {"msg": "Service running"}
-
-
-@app.route("/create", methods=["POST"])
-def create_user():
-    data = request.get_json()
-    user_id = data.get("id")
-    username = data.get("username")
-
-    exists = User.query.filter_by(id=user_id).first()
-    if exists:
-        return {"error": "Usuario ya existe"}, 400
-
-    new_user = User(id=user_id, username=username, bio="")
-    db.session.add(new_user)
-    db.session.commit()
-
-    return {"msg": "Usuario creado"}, 201
+@app.route("/users", methods=["GET"])
+def list_users():
+    
+    res= tools.call_cluster("GET", "/db/users")
+     
+    return jsonify(res.json()), res.status_code
 
 
-@app.route("/get/<int:user_id>")
+@app.route("/users/<int:user_id>", methods=["GET"])
 def get_user(user_id):
-    user = User.query.filter_by(id=user_id).first()
+    
+    res= tools.call_cluster("GET", f"/db/users/{user_id}")
+    return jsonify(res.json()), res.status_code
+   
 
-    if not user:
-        return {"error": "Usuario no encontrado"}, 404
-
-    return {
-        "id": user.id,
-        "username": user.username,
-        "bio": user.bio
-    }, 200
-
-
-@app.route("/update/<int:user_id>", methods=["PUT"])
+@app.route("/users/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
     data = request.get_json()
-    bio = data.get("bio")
 
-    user = User.query.filter_by(id=user_id).first()
+    payload = {}
+    if "username" in data:
+        payload["username"] = data["username"]
+    if "password" in data:
+        payload["password"] = bcrypt.generate_password_hash(data["password"]).decode("utf-8")
 
-    if not user:
-        return {"error": "Usuario no existe"}, 404
+    if not payload:
+        return jsonify({"error": "No hay campos para actualizar"}), 400
 
-    user.bio = bio
-    db.session.commit()
+    res = tools.call_cluster("PUT", f"/db/users/{user_id}", json=payload)
+    
+    return jsonify(res.json()), res.status_code
+    
 
-    return {"msg": "Perfil actualizado", "bio": user.bio}
-
+@app.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    
+    res = tools.call_cluster("DELETE", f"/db/users/{user_id}")
+    return jsonify(res.json()), res.status_code
+   
 
 @app.route("/")
 def index():

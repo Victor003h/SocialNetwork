@@ -19,5 +19,5 @@ class User(Base):
             "id": self.id,
             "username": self.username,
             "password_hash":self.password_hash,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None # type: ignore
         }
