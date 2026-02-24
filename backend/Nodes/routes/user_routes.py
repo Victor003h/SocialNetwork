@@ -1,11 +1,43 @@
 import requests
-
-from flask import Flask, jsonify, Blueprint, request,current_app
+from flask import jsonify, Blueprint, request,current_app
 from datetime import datetime
 
 
 user_bp = Blueprint("user_bp", __name__)
     
+
+def Call_leader(cluster,url,method):
+  
+    redirect= False
+    if not cluster.local_node.is_leader():
+        leader_address= cluster.peers[cluster.leader_id].address if (
+                    cluster.leader_id in cluster.peers) else None
+        redirect=True
+        requests.request(method=method, url=f"https://{leader_address}/db/".join(url), json=request.json, timeout=2, **cluster.secure_args)
+        return jsonify({"msg":f"leader address: {leader_address}" }), 307
+    if redirect:
+        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+
+def Save_Wallog(cluster, WALLog,operation,table_name,user,session):
+    lsn = cluster.next_lsn()
+    wal=WALLog(
+    wal_id=f"{cluster.local_node.node_id}:{lsn}",
+    node_id=cluster.local_node.node_id,
+    lsn=lsn,
+    operation=operation,
+    table_name=table_name,
+    entity_id=str(user.id),
+    payload=user.to_dict(),
+    timestamp=datetime.now()
+    )
+    if operation == "DELETE":
+        session.delete(user)
+    session.add(wal)
+    session.commit()
+    cluster.replicate_to_followers(wal)
+    
+    
+
   
 @user_bp.route("/db/users", methods=["POST"])
 def create_user():
@@ -14,28 +46,8 @@ def create_user():
     WALLog = current_app.config["WALLog"]
     User = current_app.config["User"]
     
-    data = request.json
+    data = request.get_json()
     
-    if not data: return {},400
-    redirect= False          
-    
-    leader_address= cluster.peers[cluster.leader_id].address if (
-                    cluster.leader_id in cluster.peers) else None
-    
-    if not cluster.local_node.is_leader():
-        redirect=True
-        requests.post(
-            f"https://{leader_address}/db/users",
-            json=request.json ,
-            timeout=2,
-            **cluster.secure_args
-        )
-        
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    
-    lsn=cluster.next_lsn()
     
     session=cluster.database.get_session()
     user_id=cluster.database.generate_user_id(session)
@@ -46,22 +58,8 @@ def create_user():
     )
     session.add(user) 
      
-    wal=WALLog(
-        wal_id=f"{cluster.local_node.node_id}:{lsn}",
-        node_id=cluster.local_node.node_id,
-        lsn=lsn,
-        operation="INSERT",
-        table_name="users",
-        entity_id=str(user.id),
-        payload=user.to_dict(),
-        timestamp=datetime.now()
-        )
-   
-     
-    session.add(wal)
-    session.commit()
-    
-    cluster.replicate_to_followers(wal)
+    Save_Wallog(cluster,WALLog,"INSERT","users",user,session)
+
     return jsonify({"id": user.id}), 201
 
 
@@ -71,22 +69,33 @@ def list_users():
     cluster= current_app.config["cluster"]
     User = current_app.config["User"]
     
-    redirect= False
+    Call_leader(cluster,"users","GET")
     
-    if not cluster.local_node.is_leader():
-        leader_address=cluster.peers[cluster.leader_id].address # type: ignore
-        redirect=True
-        requests.get(f"https://{leader_address}/db/users" ,timeout=2, **cluster.secure_args)
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
     session = cluster.database.get_session()
     try:
         users = session.query(User).all()
-        return jsonify([u.to_dict() for u in users]), 200
+        list_users = [user.to_dict() for user in users]
+        
+        return jsonify(list_users), 200
     finally:
         session.close()
 
+@user_bp.route("/db/users/<int:user_id>", methods=["GET"])
+def get_user(user_id):
+    cluster= current_app.config["cluster"]
+    User = current_app.config["User"]
+    
+    Call_leader(cluster,f"users/{user_id}","GET")
+    
+    session = cluster.database.get_session()
+    try:
+        user = session.get(User, user_id)
+        if not user:
+            return jsonify({"error": "user not found"}), 404
+        
+        return jsonify(user.to_dict()), 200
+    finally:
+        session.close()
 
 @user_bp.route("/db/users/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
@@ -95,17 +104,9 @@ def update_user(user_id):
     WALLog = current_app.config["WALLog"]
     User = current_app.config["User"]
     
-    data = request.json
-    if not data: return {},400
+    data = request.get_json()
     
-    redirect= False
-    if not cluster.local_node.is_leader():
-        leader_address=cluster.peers[cluster.leader_id].address # type: ignore
-        redirect=True
-        requests.put(f"https://{leader_address}/db/users/{user_id}",json=request.json ,timeout=2, **cluster.secure_args)
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+    Call_leader(cluster,f"users/{user_id}","PUT")
     
     session = cluster.database.get_session()
     try:
@@ -116,20 +117,9 @@ def update_user(user_id):
             user.username = data["username"]   
         if "password" in data: 
             user.password_hash = data["password"] 
-        lsn = cluster.next_lsn()
-        wal=WALLog(
-            wal_id=f"{cluster.local_node.node_id}:{lsn}",
-            node_id=cluster.local_node.node_id,
-            lsn=lsn,
-            operation="UPDATE",
-            table_name="users",
-            entity_id=str(user.id),
-            payload=user.to_dict(),
-            timestamp=datetime.now()
-        )
-        session.add(wal)
-        session.commit()
-        cluster.replicate_to_followers(wal)
+        
+        Save_Wallog(cluster,WALLog,"UPDATE","users",user,session)  
+         
         return jsonify({"status": "updated"}), 200
     finally:
         session.close()
@@ -142,15 +132,7 @@ def delete_user(user_id):
     WALLog = current_app.config["WALLog"]
     User = current_app.config["User"]
     
-    redirect= False
-    if not cluster.local_node.is_leader():
-        leader_address=cluster.peers[cluster.leader_id].address # type: ignore
-        redirect=True
-        requests.delete(f"https://{leader_address}/db/users/{user_id}" ,timeout=2, **cluster.secure_args)
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
-    
+    Call_leader(cluster,f"users/{user_id}","DELETE")
     
     session = cluster.database.get_session()
     try:
@@ -158,21 +140,10 @@ def delete_user(user_id):
         if not user:
             print("user with id :{user_id} not found")
             return jsonify({"error": f"user with id :{user_id} not found"}), 404
-        lsn = cluster.next_lsn()
-        wal=WALLog(
-        wal_id=f"{cluster.local_node.node_id}:{lsn}",
-        node_id=cluster.local_node.node_id,
-        lsn=lsn,
-        operation="DELETE",
-        table_name="users",
-        entity_id=str(user.id),
-        payload=user.to_dict(),
-        timestamp=datetime.now()
-        )
-        session.delete(user)
-        session.add(wal)
-        session.commit()
-        cluster.replicate_to_followers(wal)
+        
+        Save_Wallog(cluster,WALLog,"DELETE","users",user,session)
+       
         return jsonify({"status": "deleted"}), 200
     finally:
         session.close()
+

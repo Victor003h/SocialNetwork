@@ -1,11 +1,11 @@
 // src/services/authService.ts
 import { AuthResponse,LoginResponse, LoginCredentials, RegisterCredentials } from '../types/auth.types';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:5001';
+const API_URL = import.meta.env.VITE_API_BASE_URL ;
 
 async function authRequest(endpoint: string, data: object) {
     try {
-        const response = await fetch(`${API_URL}/${endpoint}`, {
+        const response = await fetch(`${API_URL}/auth/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -19,7 +19,8 @@ async function authRequest(endpoint: string, data: object) {
                 const errorData = await response.json();
                 // Si Flask mandó {"error": "...", "details": "..."}, lo usamos
                 errorMessage = errorData.details || errorData.error || errorMessage;
-            } catch (e ) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (e: unknown) {
                 // Si no es un JSON, usamos el texto plano
                 const textError = await response.text();
                 errorMessage = textError || errorMessage;
@@ -40,8 +41,9 @@ async function authRequest(endpoint: string, data: object) {
 export const authService = {
     login: async (creds: LoginCredentials) => {
         const data:LoginResponse= await authRequest('login', creds);
-        if (data.token) {
-            localStorage.setItem('jwt_token', data.token);
+        if (data.access_token) {
+            localStorage.setItem('jwt_token', data.access_token);
+            localStorage.setItem('user_info', JSON.stringify(data.user));
         }
         return data;
     },
@@ -49,14 +51,20 @@ export const authService = {
     register: async (creds: RegisterCredentials) => {
         const data:AuthResponse = await authRequest('register', creds);
         
-        return data.state;
+        return data;
     },
 
     logout: () => {
         localStorage.removeItem('jwt_token');
+        localStorage.removeItem('user_info');
     },
 
     isAuthenticated: (): boolean => {
         return !!localStorage.getItem('jwt_token');
+    },
+
+    getCurrentUser: () => {
+        const user = localStorage.getItem('user_info');
+        return user ? JSON.parse(user) : null;
     }
 };

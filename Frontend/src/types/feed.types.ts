@@ -1,22 +1,22 @@
 // src/types/feed.types.ts
 
 export interface User {
-    id: string;
+    id: number
     username: string;
-    avatarUrl?: string; // URL de la foto
+    followers: number; // Número de seguidores
+    posts: number; // Número de posts
     status?: 'online' | 'offline';
+    avatarUrl: string
 }
 
 export interface Post {
     id: string;
     userId: string;
-    authorName: string; // En un sistema real, a veces esto viene "populado" o se busca aparte
-    authorAvatar?: string;
+    UserName: string; // En un sistema real, a veces esto viene "populado" o se busca aparte
     content: string;
-    imageUrl?: string;
-    timestamp: string;
-    likes: number;
-    comments: number;
+    created: string;
+    //likes: number;
+    //comments: number;
 }
 
 export interface NewPostData {

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import BottomNav from "../components/BottomNav";
 import { PageID } from "../types/nav.types";
-import ProfileSection from "../components/Profile"; // Importar
+import ProfileSection from "../components/Profile";
 import Feed from "../components/Feed";
+import SearchUser from "../components/SearchUser";
 
 const MainPage: React.FC = () => {
   const [activePage, setActivePage] = useState<PageID>("profile");
@@ -13,6 +14,7 @@ const MainPage: React.FC = () => {
       <main className="flex-grow-1" style={{ paddingBottom: "80px" }}>
         {activePage === "feed" && <Feed />}
         {activePage === "profile" && <ProfileSection />}
+        {activePage === "search" && <SearchUser />}
       </main>
 
       <BottomNav activePage={activePage} onPageChange={setActivePage} />

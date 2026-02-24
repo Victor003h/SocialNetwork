@@ -1,42 +1,21 @@
-import requests
 import datetime
 import jwt
-import os
-
-from email.headerregistry import Address
-
-from flask import Flask,request,jsonify
-from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_bcrypt import Bcrypt
+from flask import jsonify, Blueprint, request,current_app
 
 
-from security.Cert_Manager import CertManager
-from db_config import db,DB_HOST,DB_NAME,DB_PASSWORD,DB_PORT,DB_USER
-from services.utils import utils
+auth_bp = Blueprint("auth_bp", __name__)
 
 
-app = Flask(__name__)
-CORS(app)
 
-#app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5433/{DB_NAME}"
-#app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-#db.init_app(app)
-bcrypt = Bcrypt(app)
 
-security = CertManager(cert_dir='certs')
- 
-secure_args = security.setupCerts()
-
-JWT_SECRET = os.getenv("JWT_SECRET_KEY", "supersecretkey")
-
-tools= utils(secure_args)
-
-   
-@app.route("/register", methods=["POST"])
+@auth_bp.route("/register", methods=["POST"])
 def register():
     print("Petición de registro recibida")
     data = request.get_json()
+    
+    tools = current_app.config["tools"]
+    bcrypt = current_app.config["bcrypt"]
+    
     username = data.get("username")
     password = data.get("password")
 
@@ -63,8 +42,13 @@ def register():
         return jsonify({"error": "Error al registrar usuario", "details": str(e)}), 500
     
 #  Login
-@app.route("/login", methods=["POST"])
+@auth_bp.route("/login", methods=["POST"])
 def login():
+    
+    tools = current_app.config["tools"]
+    bcrypt = current_app.config["bcrypt"]
+    JWT_SECRET = current_app.config["JWT_SECRET_KEY"]
+
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
@@ -98,21 +82,7 @@ def login():
     except Exception as e:
         return jsonify({"error": "Error conectando al cluster", "details": str(e)}), 500
 
-@app.route("/conected",methods=["GET"])
-def conected():
-    res = requests.get(
-    f"{tools.db_leader_address}/info", timeout=3, **secure_args)
-    
-    res.raise_for_status()
-    return res.json()
-
-@app.route("/check",methods=["GET"])
+@auth_bp.route("/check",methods=["GET"])
 def check():
     return jsonify({"message": "todo bien"}), 201
 
-@app.route("/")
-def index():
-    return {"msg": " Auth Service running"}
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001,ssl_context=secure_args["cert"])

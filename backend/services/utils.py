@@ -36,14 +36,19 @@ class utils:
 
         # Fusionar los argumentos de seguridad
         request_kwargs = {**self.secure_args, **kwargs}
-
+        headers={
+            'Accept': 'application/json'
+        }
+        
+        if method.upper() in ['POST', 'PUT']:
+            headers['Content-Type'] = 'application/json'
         try:
             if not self.db_leader_address:
                 raise Exception("Dirección del líder no disponible")
 
             url = f"{self.db_leader_address}{endpoint}"
-            print(f"[CLUSTER-CALL] {method} a {url}")
-            res = requests.request(method, url, **request_kwargs)
+            print(f"[CLUSTER-CALL] {method} a {url} con {headers}")
+            res = requests.request(method, url, headers=headers,**request_kwargs)
             res.raise_for_status()
             return res
         except (requests.exceptions.RequestException, Exception) as e:
@@ -56,7 +61,7 @@ class utils:
                 self.db_leader_address = new_address
                 url = f"{self.db_leader_address}{endpoint}"
                 print(f"[CLUSTER-CALL] Reintentando {method} a {url}")
-                res = requests.request(method, url, **request_kwargs)
+                res = requests.request(method, url, headers=headers,**request_kwargs )
                 res.raise_for_status()
                 return res
             else:

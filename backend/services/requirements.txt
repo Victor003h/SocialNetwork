@@ -1,9 +1,11 @@
 flask
+requests
+pyjwt
 flask_sqlalchemy
 flask_bcrypt
 flask_cors
-pyjwt
 psycopg2-binary
 python-dotenv
-requests
 cryptography
+
+

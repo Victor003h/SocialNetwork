@@ -108,22 +108,17 @@ docker logs -f node3
 En backend/services/auth
 
 ```bash
-docker build -f Dockerfile -t auth_service
+docker build -f ./services/Dockerfile -t api_services
 
 ```
 
 ```bash
 docker run  -d  \
-            --name auth_service \
+            --name api_services \
             --hostname node4.cluster_net \
             --network cluster_net \
             -v "$(pwd)/deploy_certs/node_4:/app/certs" \
-            -p 5001:5001  \
-            -e POSTGRES_USER=admin \
-            -e POSTGRES_PASSWORD=secret \
-            -e POSTGRES_DB=auth_db \
-            -e DB_HOST=172.17.0.1 \
-            -e DB_PORT=5433  \
-            -e JWT_SECRET_KEY=supersecretkey   auth_service
+            -p 8080: 8080  \
+            -e JWT_SECRET_KEY=supersecretkey   api_services
 
 ```

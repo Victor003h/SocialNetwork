@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { postService, userService } from "../services/DataServices";
+import { postService } from "../services/PostServices";
 import { Post, User } from "../types/feed.types";
-
+import { followServices } from "../services/FollowsServices";
 const Feed: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<User[]>([]);
@@ -16,7 +16,7 @@ const Feed: React.FC = () => {
         const [fetchedPosts, fetchedFriends] = await Promise.all([
           // Nota: Si el backend no responde aún, puedes comentar estas líneas y usar datos falsos para probar la UI
           postService.getFeed().catch(() => []),
-          userService.getFriends().catch(() => []),
+          followServices.getFollowed().catch(() => []),
         ]);
 
         // --- MOCK DATA TEMPORAL (Para que veas la UI mientras configuras el backend) ---
@@ -26,40 +26,43 @@ const Feed: React.FC = () => {
             {
               id: "1",
               userId: "u1",
-              authorName: "Satoshi Nakamoto",
+              UserName: "Satoshi Nakamoto",
               content:
                 "The block synchronization latency between Tokyo and London has dropped significantly.",
-              likes: 142,
-              comments: 12,
-              timestamp: "2m",
-              authorAvatar: "https://i.pravatar.cc/150?u=satoshi",
+              created: "2015/05/12",
+              //comments: 12,
             },
             {
               id: "2",
               userId: "u2",
-              authorName: "Elena Wright",
+              UserName: "Elena Wright",
               content:
                 "Testing out the new geographic scalability protocols. Shard hopping is working perfectly!",
-              likes: 88,
-              comments: 4,
-              timestamp: "15m",
-              authorAvatar: "https://i.pravatar.cc/150?u=elena",
+              created: "2015/05/12",
+              //likes: 88,
+              //comments: 4,
             },
           ]);
           setFriends([
             {
-              id: "f1",
+              id: 1,
               username: "Satoshi",
+              followers: 100,
+              posts: 6,
               avatarUrl: "https://i.pravatar.cc/150?u=satoshi",
             },
             {
-              id: "f2",
+              id: 3,
               username: "Elena",
+              followers: 100,
+              posts: 6,
               avatarUrl: "https://i.pravatar.cc/150?u=elena",
             },
             {
-              id: "f3",
+              id: 5,
               username: "Marco",
+              followers: 100,
+              posts: 6,
               avatarUrl: "https://i.pravatar.cc/150?u=marco",
             },
           ]);
@@ -79,10 +82,26 @@ const Feed: React.FC = () => {
   }, []);
 
   const handlePublish = async () => {
+    console.log("entro");
     if (!newPostContent.trim()) return;
     try {
+      console.log(newPostContent);
       // Optimistic UI: Agregamos el post localmente antes de confirmar (opcional)
-      await postService.createPost({ content: newPostContent });
+
+      await postService.createPost(newPostContent);
+      alert("Post enviado a la cola de replicación");
+      setNewPostContent("");
+      // Recargar feed...
+    } catch (error: unknown) {
+      alert("Error publicando: " + (error as Error).message);
+    }
+  };
+
+  const handleReply = async (content: string) => {
+    try {
+      // Optimistic UI: Agregamos el post localmente antes de confirmar (opcional)
+
+      await postService.createPost(content);
       alert("Post enviado a la cola de replicación");
       setNewPostContent("");
       // Recargar feed...
@@ -128,7 +147,7 @@ const Feed: React.FC = () => {
             </div>
             {/* Lista de Amigos */}
             {friends.map((friend) => (
-              <div key={friend.id} className="text-center">
+              <div key={friend.username} className="text-center">
                 <div
                   className="rounded-circle p-1 border border-primary mx-auto"
                   style={{ width: 54, height: 54 }}
@@ -202,26 +221,15 @@ const Feed: React.FC = () => {
                 className="card bg-black border-secondary mb-3"
               >
                 <div className="card-body d-flex gap-3">
-                  <div
-                    className="rounded-circle bg-secondary flex-shrink-0"
-                    style={{
-                      width: 45,
-                      height: 45,
-                      backgroundImage: `url(${post.authorAvatar})`,
-                      backgroundSize: "cover",
-                    }}
-                  ></div>
                   <div className="w-100">
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
-                        <span className="fw-bold me-2">{post.authorName}</span>
+                        <span className="fw-bold me-2">{post.UserName}</span>
                         <span className="text-muted small">
-                          @{post.authorName.split(" ")[0].toLowerCase()}
+                          @{post.UserName.split(" ")[0].toLowerCase()}
                         </span>
                         <span className="text-muted small mx-1">·</span>
-                        <span className="text-muted small">
-                          {post.timestamp}
-                        </span>
+                        <span className="text-muted small">{post.created}</span>
                       </div>
                       <i className="bi bi-three-dots text-muted"></i>
                     </div>
@@ -232,17 +240,14 @@ const Feed: React.FC = () => {
                       className="d-flex justify-content-between mt-3 text-muted"
                       style={{ maxWidth: "300px" }}
                     >
+                      <button
+                        className="btn btn-primary rounded-pill px-4 fw-bold"
+                        onClick={() => handleReply(post.content)}
+                      >
+                        Reply
+                      </button>
                       <span className="d-flex align-items-center gap-1">
-                        <i className="bi bi-chat"></i>{" "}
-                        <small>{post.comments}</small>
-                      </span>
-                      <span className="d-flex align-items-center gap-1">
-                        <i className="bi bi-arrow-repeat"></i>{" "}
-                        <small>Replicate</small>
-                      </span>
-                      <span className="d-flex align-items-center gap-1">
-                        <i className="bi bi-heart"></i>{" "}
-                        <small>{post.likes}</small>
+                        <i className="bi bi-heart"></i> <small>{100}</small>
                       </span>
                       <i className="bi bi-share"></i>
                     </div>

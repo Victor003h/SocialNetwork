@@ -27,7 +27,7 @@ class Database:
 
     def setupDatabase(self):
         self.create_tables()
-        Table_List=["users","posts"]
+        Table_List=["users","posts","follows"]
         with self.engine.begin() as conn:
             for table in Table_List:
                 conn.execute(text(f"""
@@ -60,3 +60,9 @@ class Database:
         text("SELECT nextval('posts_id_seq')")
         )
         return result.scalar()
+    
+    def generate_follower_id(self, session):
+        result = session.execute(
+        text("SELECT nextval('follows_id_seq')")
+        )
+        return result.scalar() 

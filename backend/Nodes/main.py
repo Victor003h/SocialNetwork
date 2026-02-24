@@ -6,6 +6,7 @@ from HeartbeatSender import HeartbeatSender
 from routes.post_routes import post_bp
 from routes.user_routes import user_bp
 from routes.node_routes import node_bp
+from routes.follow_routes import followes_bp
 
 from node import Node
 
@@ -14,6 +15,7 @@ from cluster import ClusterContext
 from models.wal import WALLog
 from models.user import User
 from models.post import Post
+from models.follows import Follower
 
 
 def create_app(cluster: ClusterContext) -> Flask:
@@ -27,10 +29,12 @@ def create_app(cluster: ClusterContext) -> Flask:
     app.config["WALLog"] = WALLog
     app.config["User"] = User
     app.config["Post"] = Post
+    app.config["Follower"] = Follower
     
     app.register_blueprint(post_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(node_bp)
+    app.register_blueprint(followes_bp)
     
     return app
 

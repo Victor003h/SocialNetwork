@@ -1,19 +1,20 @@
 // src/types/profile.types.ts
 
 export interface UserProfile {
-    id: string;
+    id: number;
     username: string;
-    email: string;
-    bio: string;
-    location: string;
-    avatarUrl: string;
-    bannerUrl?: string; // Opcional: fondo de perfil
-    joinDate: string;
+    createdAt: Date;
+    postCount: number;
+    followerCount: number;
+    
 }
 
 // Datos que permitimos editar (no dejamos editar ID ni email por seguridad usualmente)
 export interface ProfileUpdateData {
-    bio?: string;
-    location?: string;
-    avatarUrl?: string;
+    
+    id?: number; // Opcional, se puede usar para identificar el nodo
+    username: string;
+    password?: string;
+    
+    
 }
