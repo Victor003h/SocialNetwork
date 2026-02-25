@@ -103,9 +103,9 @@ docker logs -f node3
 
 ```
 
-## 6 Levantar servico de auth
+## 6 Levantar servicios de api
 
-En backend/services/auth
+En backend/services/api_services
 
 ```bash
 docker build -f ./services/Dockerfile -t api_services
@@ -121,4 +121,22 @@ docker run  -d  \
             -p 8080: 8080  \
             -e JWT_SECRET_KEY=supersecretkey   api_services
 
+```
+
+## 7 Levantar frontend
+
+en Frontend/
+
+```bash
+
+docker build -f ./Dockerfile -t web_app
+
+```
+
+```bash
+
+docker run  -d \
+            --network cluster_net \
+            --name social_network  \
+            -p 1000:80 web_app
 ```

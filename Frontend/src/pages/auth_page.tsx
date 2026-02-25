@@ -37,7 +37,7 @@ const AuthPage: React.FC<{ onAuthChange: () => void }> = ({ onAuthChange }) => {
         // Aquí harías: window.location.href = '/feed';
       } else {
         const registerResult = await authService.register(formData);
-        if (registerResult == 200) {
+        if (registerResult.state == 200) {
           alert(
             "Usuario registrado en el sistema distribuido. Ahora inicia sesión.",
           );
@@ -45,7 +45,7 @@ const AuthPage: React.FC<{ onAuthChange: () => void }> = ({ onAuthChange }) => {
         } else {
           setError(
             "Error al registrar el usuario servidor respondió con código: " +
-              registerResult,
+              registerResult.state,
           );
         }
       }
