@@ -23,6 +23,7 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecretkey")
 # Inicializar Seguridad para hablar con el Clúster
 security = CertManager(cert_dir='certs')
 secure_args = security.setupCerts()
+ssl_context = security.get_mtls_context()
 tools = utils(secure_args)
 bcrypt = Bcrypt(app)
 
@@ -67,6 +68,7 @@ def health():
 
 if __name__ == "__main__":
     
+    
     CORS(app)
     
-    app.run(host="0.0.0.0", port=8080,ssl_context=secure_args["cert"])
+    app.run(host="0.0.0.0", port=7000,ssl_context=secure_args["cert"])

@@ -27,7 +27,6 @@ async function authRequest(endpoint: string, data: object) {
             }
             throw new Error(errorMessage);
         }
-
         return await response.json();
 
     } catch (error: unknown) {

@@ -1,13 +1,12 @@
 import threading
 import time
 
-from cluster import ClusterContext
 
 
 class FailureDetector:
     def __init__(
         self,
-        cluster_context:ClusterContext,
+        cluster_context,
         heartbeat_timeout: float = 10.0,
         check_interval: float = 5.0,
     ):
@@ -41,12 +40,6 @@ class FailureDetector:
     def stop(self):
         self._running = False
 
-    def notify_heartbeat(self):
-        """
-        Se llama cuando llega un heartbeat del líder
-        """
-        self._last_heartbeat = time.time()
-
     # ==============================
     # Lógica interna
     # ==============================
@@ -54,19 +47,26 @@ class FailureDetector:
     def _monitor_loop(self):
         while self._running:
             time.sleep(self.check_interval)
-
             # Si yo soy líder, no monitoreo a nadie
             if self.cluster.local_node.is_leader():
                 continue
 
-            elapsed = time.time() - self.cluster.last_heartbeat
+            is_subleader= self.cluster.local_node.is_subleader()
+            
+            if is_subleader:
+                elapsed = time.time() - self.cluster.last_heartbeat_leader    
+            else:
+                elapsed = time.time() - self.cluster.last_heartbeat
            # print(f"[FailureDetector] In time {time.time()} last heartbeat {self.cluster.last_heartbeat}")
             
             if elapsed > self.heartbeat_timeout:
-                print("[FailureDetector] Leader timeout detected")
-                self._handle_leader_failure()
+                if is_subleader:
+                    print("[FailureDetector] leader timeout detected")
+                else:
+                    print("[FailureDetector] subleader timeout detected")
+                self._handle_leader_failure(is_subleader)
 
-    def _handle_leader_failure(self):
+    def _handle_leader_failure(self, is_subleader):
         """
         Notifica al cluster que el líder falló
         """
@@ -75,4 +75,9 @@ class FailureDetector:
             return
 
         print("[FailureDetector] Triggering leader election")
-        self.cluster.start_election()
+        
+        if is_subleader:
+            peers= self.cluster.subleader_manager.subleader_list
+        else:
+            peers = self.cluster.get_peers()
+        self.cluster.start_election(peers)

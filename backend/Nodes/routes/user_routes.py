@@ -1,3 +1,5 @@
+from typing import Self
+
 import requests
 from flask import jsonify, Blueprint, request,current_app
 from datetime import datetime
@@ -7,16 +9,15 @@ user_bp = Blueprint("user_bp", __name__)
     
 
 def Call_leader(cluster,url,method):
-  
-    redirect= False
-    if not cluster.local_node.is_leader():
-        leader_address= cluster.peers[cluster.leader_id].address if (
-                    cluster.leader_id in cluster.peers) else None
-        redirect=True
-        requests.request(method=method, url=f"https://{leader_address}/db/".join(url), json=request.json, timeout=2, **cluster.secure_args)
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+
+        leader=cluster.subleader_manager.global_leader               
+        node_data = {
+            "ip": leader.ip,
+            "hostname": leader.host,
+            "port": cluster.local_node.port,
+        } 
+        return cluster.utils.Remote_Comunicate(method, url, node_data, cluster.secure_args,json= request.json)
+        
 
 def Save_Wallog(cluster, WALLog,operation,table_name,user,session):
     lsn = cluster.next_lsn()
@@ -34,8 +35,7 @@ def Save_Wallog(cluster, WALLog,operation,table_name,user,session):
         session.delete(user)
     session.add(wal)
     session.commit()
-    cluster.replicate_to_followers(wal)
-    
+    cluster.subleader_manager.relay_replication(wal)
     
 
   
@@ -46,8 +46,13 @@ def create_user():
     WALLog = current_app.config["WALLog"]
     User = current_app.config["User"]
     
-    data = request.get_json()
     
+    print(f"El nodo que recibio la peticion tiene el rol de {cluster.local_node.role} ")
+    
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,"/db/users","POST")
+    
+    data = request.get_json()
     
     session=cluster.database.get_session()
     user_id=cluster.database.generate_user_id(session)
@@ -69,8 +74,6 @@ def list_users():
     cluster= current_app.config["cluster"]
     User = current_app.config["User"]
     
-    Call_leader(cluster,"users","GET")
-    
     session = cluster.database.get_session()
     try:
         users = session.query(User).all()
@@ -84,8 +87,6 @@ def list_users():
 def get_user(user_id):
     cluster= current_app.config["cluster"]
     User = current_app.config["User"]
-    
-    Call_leader(cluster,f"users/{user_id}","GET")
     
     session = cluster.database.get_session()
     try:
@@ -106,7 +107,8 @@ def update_user(user_id):
     
     data = request.get_json()
     
-    Call_leader(cluster,f"users/{user_id}","PUT")
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,f"/db/users/{user_id}","PUT")
     
     session = cluster.database.get_session()
     try:
@@ -132,7 +134,8 @@ def delete_user(user_id):
     WALLog = current_app.config["WALLog"]
     User = current_app.config["User"]
     
-    Call_leader(cluster,f"users/{user_id}","DELETE")
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,f"/db/users/{user_id}","DELETE")
     
     session = cluster.database.get_session()
     try:

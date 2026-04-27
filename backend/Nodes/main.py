@@ -1,4 +1,5 @@
 from flask import Flask
+
 from Failure_Detector import FailureDetector
 from HeartbeatSender import HeartbeatSender
 
@@ -68,33 +69,34 @@ def main():
 
 
     print("[DISCOVERY] Notifying my existence")
-    cluster.Notify_existence()
+    cluster.Notify_existence(cluster.get_peers())
 
 
 
     # -------------------------
     # 4. Nodo listo 
     # -------------------------
-    print("[READY] Node ready for leader election")
+    print("[READY] Node ready for subleader election")
     print(cluster)
 
 
     if  len(cluster.peers)==0:
-        print(" Leader not found")
-        cluster.local_node.set_role("leader")
-        cluster.set_leader(cluster.local_node.node_id)
-        
+        print(" subleader not found")
+        cluster.local_node.set_role("subleader")
+        cluster.set_subleader(cluster.local_node.node_id)
+          
     else:
-        print(f"Found Leader :{cluster.leader_id}")
+        print(f"Found subleader :{cluster.subleader_id}")
 
 
-    if not cluster.local_node.is_leader():
-        cluster.sync_from_leader()
+    if not cluster.local_node.is_subleader():
+        cluster.sync_from_leader(cluster.peers)
 
 
-    if(cluster.local_node.is_leader()):
+    if(cluster.local_node.is_subleader()):
         heartbead=HeartbeatSender(cluster)
         heartbead.start()
+        cluster.subleader_manager.become_subleader()
     else:
         failure_detector=FailureDetector(cluster)
         failure_detector.start()
@@ -108,7 +110,7 @@ def main():
     port = local_node.port
     print(f"[START] Control server running on port {port}")
 
-    ssl_context = cluster.secure_args["cert"]
+    ssl_context = cluster.security.get_mtls_context()
     
     app.run(host="0.0.0.0", port=port,ssl_context=ssl_context)
 

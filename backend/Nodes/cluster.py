@@ -1,23 +1,24 @@
-from multiprocessing import set_forkserver_preload
-import select
-from operator import add
-import select
-import socket
-from tarfile import data_filter
+import requests
 import time
 from typing import Dict, List
 import os
-from flask import session
 import requests
-from sqlalchemy import Boolean, false, func, text
+from sqlalchemy import text
+
 
 from DataBase import Database
 
-from node import Node
-from security.Cert_Manager import CertManager
+from models.post import Post
+from models.follows import Follower
 from models.user import User
 from models.wal import WALLog
 
+from node import Node
+from node_utils import utils
+from Subleader_manager import subleaderManager
+from HeartbeatSender import HeartbeatSender
+
+from security.Cert_Manager import CertManager
 
 class ClusterContext:
     """
@@ -32,14 +33,20 @@ class ClusterContext:
         self.peers: Dict[int, Node] = {}
 
         # Información global del cluster
-        self.leader_id: int | None = None
+        self.subleader_id: int | None = None
 
         self.election_in_progress=False
         
         self.last_heartbeat = time.time()
         
+        self.last_heartbeat_leader = time.time()
+        
         self.database = Database()
         
+        self.subleader_manager= subleaderManager(self)
+        
+        self.utils=utils()
+                
         self.database.setupDatabase()
         
         self.security = CertManager(cert_dir='certs')
@@ -47,60 +54,27 @@ class ClusterContext:
         self.secure_args= self.security.setupCerts()
     
         self.last_applied_lsn=0
-       
-
-    # -------------------------
-    # Discovery
-    # -------------------------
-
+    
+   
     def discover_peers(self):
         """
         Descubre nodos pares usando DNS del servicio (Docker Swarm).
         """
-        service_name = self.local_node.service_name
         network_name=os.getenv("NETWORK-ALIAS","cluster_net_serv")
-
-        try:
-            _, _, addresses = socket.gethostbyname_ex(network_name)
-        except socket.gaierror as e:
-            print( e.errno )
-            print (e.strerror)
-            addresses = []
         
-        self.peers={}
-        for addr in addresses:
-            addr,_,_=socket.gethostbyaddr(addr)
-            print(f"Descubriendo nodo en {addr}")
-            # Excluirse a sí mismo
-           
-            if addr == self.local_node.host:
-                continue
-
-            response=  requests.get(f"https://{addr}:{self.local_node.port}/info", timeout=2, **self.secure_args)
-
-            data=response.json()
+        cluster_data= self.utils.Get_Local_Nodes_M1(network_name,self.local_node,self.secure_args)
+        
+        if cluster_data: 
+        
+            self.peers= cluster_data.get("peers",{})
             
-            leader_id=data.get("leader_id")
-
-            node=data.get("local_node",{})
-
-            role=node.get("role")
-            if role=="leader":
-                self.leader_id=leader_id
-                self.local_node.role="follower"
-                self.last_heartbeat=time.time()
+            subleader= cluster_data.get("subleader_id")
+            if subleader     :  self.subleader_id= subleader
             
-
-            peer = Node(
-                node_id=node.get("node_id"),
-                service_name=node.get("service_name"),
-                port=self.local_node.port,
-            )
-            peer.host = addr
-            peer.address = f"{addr}:{peer.port}"
-            peer.role=role
-
-            self.peers[peer.node_id]=peer
+            last_heartbeat = cluster_data.get("last_heartbeat")
+            if last_heartbeat: self.last_heartbeat = last_heartbeat
+            
+        
 
 
     def _register_peer(self, peer: Node):
@@ -129,23 +103,51 @@ class ClusterContext:
         return len(self.peers) == 0
 
     
-
-    def start_election(self):
+    def General_Endpoint(self,peer:Node,method,endpoint,**kwargs):
+        
+    
+        if self.local_node.role == "subleader":
+            peer_data={
+                "ip": peer.ip,
+                "hostname": peer.host,
+                "port": peer.port
+            }
+            res =self.utils.Remote_Comunicate(
+                method, 
+                endpoint, 
+                peer_data ,
+                self.secure_args,
+                **kwargs
+            )
+            return  res
+        
+        request_kwargs = { **self.secure_args, **kwargs }
+        res=requests.request(method, 
+                             f"https://{peer.host}:{self.local_node.port}/{endpoint}", 
+                             timeout=2, 
+                             **request_kwargs)
+        res.raise_for_status()
+        data=res.json()
+             
+        return data
+    
+    def start_election(self,peers):
+        
         if self.election_in_progress:
             return
-
-        self.discover_peers()
+        
         self.election_in_progress = True
         local_id = self.local_node.node_id
         higher_nodes = [
-            peer for peer in self.get_peers() if (peer.node_id > local_id) and peer.alive
+            peer for peer in peers if (peer.node_id > local_id) and peer.alive
         ]
 
         print(f"[ELECTION] Node {local_id} starting election")
        
         for peer in higher_nodes:
             try:
-                requests.post(f"https://{peer.address}/election", timeout=2, **self.secure_args)
+                
+                self.General_Endpoint(peer,"POST","election")
                 self.election_in_progress = False
                 print(f"[ELECTION] recibo respuesta de  {peer.node_id}")
                 return
@@ -153,51 +155,66 @@ class ClusterContext:
                 continue
 
         # Nadie respondió → soy líder
-        self.become_leader()
+        self.become_leader(peers)
 
-    def become_leader(self):
+    def become_leader(self, peers):
+        
         node = self.local_node
-        node.set_role("leader")
-        self.set_leader(node.node_id)
+        
+        rol= "subleader" if node.role!="subleader" else "leader"
+        
+        node.set_role(rol)
+        
 
-        print(f"[LEADER] Node {node.node_id} became leader")
+        print(f"[LEADER] Node {node.node_id} became {rol}")
 
-        session = self.database.get_session()
+        if rol=="subleader":
+            self.set_subleader(node.node_id)
+            self.subleader_manager.become_subleader()
+        else:
+            
+            self.set_leader(node.node_id)
+            session = self.database.get_session()
 
-        session.execute(text("""
-            SELECT setval(
-                'users_id_seq',
-                (SELECT COALESCE(MAX(id), 0) FROM users)
-            )
-        """))
+            session.execute(text("""
+                SELECT setval(
+                    'users_id_seq',
+                    (SELECT COALESCE(MAX(id), 1) FROM users)
+                )
+            """))
 
-        session.commit()
-        session.close()
+            session.commit()
+            session.close()
 
 
-        for peer in self.get_peers():
+        for peer in peers:
             try:
                 if not  peer.alive:continue
-                requests.post(
-                    f"https://{peer.address}/leader",
-                    json={"leader_id": node.node_id},
-                    timeout=2,
-                    **self.secure_args
-                )
+                self.General_Endpoint(peer,"POST",rol,json={ f"{rol}_id": node.node_id})
+                
             except requests.RequestException:
                 pass
-
-
-        requests.post(f"https://{self.local_node.address}/start_heartbeat" ,timeout=2, **self.secure_args)  
-
+    
+        self.StartHeartBeat()
  
         self.election_in_progress = False
-
+    
+    def StartHeartBeat(self):
+        heartbead=HeartbeatSender(self)
+        heartbead.start()
+        return {"status":"ok"}
     def set_leader(self, node_id: int):
-        self.leader_id = node_id
+        
+        if self.local_node.role=="leader":
+            self.subleader_manager.global_leader_id = node_id
+    
+    def set_subleader(self, node_id: int):
+        
+        if self.local_node.role=="subleader":
+            self.subleader_id = node_id
 
     def exists_leader(self) -> bool:
-        return self.leader_id is not None
+        return self.subleader_id is not None
        
     def to_dict(self) -> dict:
         """
@@ -205,7 +222,8 @@ class ClusterContext:
         """
         return {
             "local_node": self.local_node.to_dict(),
-            "leader_id": self.leader_id,
+            "subleader_id": self.subleader_id,
+            "node_pc_id": self.local_node.node_pc_id,
             "peers": [peer.to_dict() for peer in self.peers.values()],
         }
 
@@ -213,61 +231,46 @@ class ClusterContext:
         return (
             f"<ClusterContext local={self.local_node.node_id} "
             f"peers={len(self.peers)} "
-            f"leader={self.leader_id}>"
+            f"leader={self.subleader_id}>"
         )
 
-    def Notify_existence(self):
-        for peer in self.peers.values():
+    def Notify_existence(self, peers):
+        for peer in peers:
             if not  peer.alive:continue
             data=self.local_node.to_dict()
             print(f"Notifinando a {peer.address}")
-            requests.post(f"https://{peer.address}/newNode",json=data ,timeout=2, **self.secure_args)
-
-    
+            self.General_Endpoint(peer,"POST","newNode",json=data)
+           
     def replicate_to_followers(self,wal):
         for peer in self.peers.values():
             if not  peer.alive:continue
+            print (peer)
             data=wal.to_dict()
-            requests.post(f"https://{peer.address}/replicate",json=data ,timeout=2, **self.secure_args)
-
+            self.General_Endpoint(peer,"POST","replicate",json=data)
+        
   
 
     def apply_operation(self,msg):
         session = self.database.get_session()
 
-        try:
-            if msg["operation"] == "INSERT":
-                user = User(**msg["payload"])
-                session.add(user)
-
-            elif msg["operation"] == "UPDATE":
-                user = session.get(User, msg["payload"]["id"])
-                if user:
-                    user.username = msg["payload"]["username"]
-                    user.password_hash = msg["payload"]["password_hash"]
-
-            elif msg["operation"] == "DELETE":
-                user = session.get(User, msg["payload"]["id"])
-                if user:
-                    session.delete(user)
-
-            session.commit()
-
-        finally:
-            session.close()
+        table_name= msg["table_name"]
+        
+        if table_name == "users":
+            User.Replicate_user(msg,session)
+        elif table_name == "posts":
+            Post.Replicate_Post(msg,session)
+        elif table_name == "follows":
+            Follower.Replicate_Follower(msg,session)
+        else:
+            print("La tabla a replicar no existe")
 
         
-    def sync_from_leader(self):
-        leader = self.peers[self.leader_id] # type: ignore
-
-        res = requests.post(
-            f"https://{leader.address}/sync",
-            json={"last_lsn": self.last_applied_lsn},
-            timeout=3,
-            **self.secure_args
-        )
-
-        wal_entries = res.json()
+    def sync_from_leader(self, peers):
+        leader = peers[self.subleader_id] # type: ignore
+        json={"last_lsn": self.last_applied_lsn}
+        
+        wal_entries = self.General_Endpoint(leader,"POST","sync", json=json)
+        
         if not wal_entries:
             return
 
@@ -294,7 +297,11 @@ class ClusterContext:
         self.last_applied_lsn=self.last_applied_lsn+1
         return self.last_applied_lsn
     
-    def mark_peer_down(self,peer):
-        self.peers[peer.node_id].alive=False
+    def mark_peer_down(self,peer,is_leader):
+        
+        if is_leader and self.local_node.role=="subleader":
+            self.subleader_manager.subleader_list.remove(peer.node_id)
+        else:
+            self.peers[peer.node_id].alive=False
 
     

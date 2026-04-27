@@ -13,11 +13,39 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.now)
 
-    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.created_at is None:
+            self.created_at = datetime.now() # O datetime.utcnow() si usas UTC
+            
     def to_dict(self):
         return {
             "id": self.id,
             "username": self.username,
             "password_hash":self.password_hash,
-            "created_at": self.created_at   
+            "created_at": self.created_at.isoformat()   
         }
+    
+    @staticmethod
+    def Replicate_user(msg,session):
+        try:
+            if msg["operation"] == "INSERT":
+                user = User(**msg["payload"])
+                session.add(user)
+
+            elif msg["operation"] == "UPDATE":
+                user = session.get(User, msg["payload"]["id"])
+                if user:
+                    user.username = msg["payload"]["username"]
+                    user.password_hash = msg["payload"]["password_hash"]
+
+            elif msg["operation"] == "DELETE":
+                user = session.get(User, msg["payload"]["id"])
+                if user:
+                    session.delete(user)
+
+            session.commit()
+
+        finally:
+            session.close()
+        

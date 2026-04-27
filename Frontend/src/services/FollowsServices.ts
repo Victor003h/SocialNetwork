@@ -1,6 +1,6 @@
 import { getAuthHeaders,getUser } from "../utils/utils";
 import { User } from "../types/feed.types";
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7000';
 
 export const followServices ={
 
@@ -9,7 +9,7 @@ export const followServices ={
         const user = getUser()
 
         try {
-            const res = await fetch(`${API_URL}/follows/followers/${user.id}`, {
+            const res = await fetch(`${API_URL}/follows/follower/${user.id}`, {
                 method: 'GET',
                 headers: getAuthHeaders()
             });

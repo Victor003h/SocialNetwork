@@ -21,7 +21,12 @@ class WALLog(Base):
 
     timestamp = Column(DateTime, default=datetime.now())
     applied = Column(Boolean, default=False)
-
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.timestamp is None:
+            self.timestamp = datetime.now() # O datetime.utcnow() si usas UTC
+            
     def to_dict(self):
         return {
             "wal_id": self.wal_id,

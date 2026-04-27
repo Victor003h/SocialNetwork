@@ -9,17 +9,16 @@ followes_bp = Blueprint("followes_bp", __name__)
 
 def Call_leader(cluster,url,method):
   
-    redirect= False
-    if not cluster.local_node.is_leader():
-        leader_address= cluster.peers[cluster.leader_id].address if (
-                    cluster.leader_id in cluster.peers) else None
-        redirect=True
-        requests.request(method=method, url=f"https://{leader_address}/db/"+ url, json=request.json, timeout=2, **cluster.secure_args)
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+
+    print("redirigiendo al lider")
+    leader=cluster.subleader_manager.global_leader               
+    node_data = {
+        "ip": leader.ip,
+        "hostname": leader.host,
+        "port": cluster.local_node.port,
+    } 
+    return cluster.utils.Remote_Comunicate(method, url, node_data, cluster.secure_args,json= request.json)
     
-    return True
 def Save_Wallog(cluster, WALLog,operation,table_name,follower,session):
     lsn = cluster.next_lsn()
     wal=WALLog(
@@ -37,9 +36,9 @@ def Save_Wallog(cluster, WALLog,operation,table_name,follower,session):
     session.add(wal)
     session.commit()
     session.refresh(follower)
-    cluster.replicate_to_followers(wal)
-    
-    
+    cluster.subleader_manager.relay_replication(wal)
+
+
 @followes_bp.route("/db/follows", methods=["POST"])
 def create_follows():
     
@@ -47,10 +46,10 @@ def create_follows():
     WALLog = current_app.config["WALLog"]
     Follower = current_app.config["Follower"]
     
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,"/db/follows","POST")
+    
     data = request.get_json()
-    
-    Call_leader(cluster,"follows","POST")
-    
     
     session=cluster.database.get_session()
     id=cluster.database.generate_follower_id(session)
@@ -77,8 +76,10 @@ def delete_follow():
     Follower = current_app.config["Follower"]
     WALLog = current_app.config["WALLog"]
     
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,"/db/follows","DELETE")
+     
     data = request.get_json()
-    
     follower = data ["follower_id"]
     folled   = data ["followed_id"]
     
@@ -116,9 +117,7 @@ def get_user_followed(user_id):
     User = current_app.config["User"]
     Follower = current_app.config["Follower"]
     
-    print("entro a call_leader",flush=True)
-    Call_leader(cluster,f"follows/followed/{user_id}","GET")
-    print("el error es en call_leader",flush=True)
+   
     session = cluster.database.get_session()
     try:
         # 1. Buscamos en la tabla de asociación los IDs que sigue este usuario
@@ -133,10 +132,8 @@ def get_user_followed(user_id):
         followed_ids = [f.followed_id for f in followed_ids_query]
         # 2. Obtenemos la información de esos usuarios
         followed_users = session.query(User).filter(User.id.in_(followed_ids)).all()
-        list_users = []
-        for user in followed_users:
-            user =user.to_dict()
-            list_users.append(user.username)
+        list_users = [user.to_dict() for user in followed_users]
+        
         return jsonify(list_users), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -152,9 +149,7 @@ def get_user_follower(user_id):
     cluster = current_app.config["cluster"]
     User = current_app.config["User"]
     Follower = current_app.config["Follower"] # Asegúrate de pasar el modelo al config
-    
-    Call_leader(cluster,f"follows/follower/{user_id}","GET")
-    
+        
     session = cluster.database.get_session()
     try:
         # 1. Buscamos en la tabla de asociación los IDs que siguen a este usuario
@@ -168,10 +163,7 @@ def get_user_follower(user_id):
 
         # 2. Obtenemos la información de esos usuarios
         follower_users = session.query(User).filter(User.id.in_(follower_ids)).all()
-        list_users = []
-        for user in follower_users:
-            user =user.to_dict()
-            list_users.append(user.username)
+        list_users = [user.to_dict() for user in follower_users]
             
         return jsonify(list_users), 200
     except Exception as e:

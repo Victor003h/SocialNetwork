@@ -1,3 +1,4 @@
+import ssl
 import os
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -15,6 +16,26 @@ class CertManager:
         self.node_key_path = os.path.join(cert_dir, 'node.key')
         
         self._validate_deployment()
+
+    def get_mtls_context(self, require_client_auth=True):
+        """
+        Crea un contexto SSL que obliga al cliente a presentar un certificado válido.
+        """
+        # 1. Crear contexto para autenticación de cliente (mTLS)
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+
+        # 2. Cargar mi propia llave y cert (identidad del servidor)
+        context.load_cert_chain(certfile=self.node_cert_path, keyfile=self.node_key_path)
+
+        # 3. Cargar la CA para verificar a los clientes
+        context.load_verify_locations(cafile=self.ca_cert_path)
+
+        # 4. CRÍTICO: Exigir certificado al cliente
+        if require_client_auth:
+            context.verify_mode = ssl.CERT_REQUIRED
+        else:
+            context.verify_mode = ssl.CERT_NONE
+        return context
 
     def setupCerts(self):
         

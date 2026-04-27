@@ -12,6 +12,6 @@ ENV PYTHONPATH=/app
 
 RUN mkdir -p /app/certs
 
-EXPOSE 5000
+EXPOSE 7000
 
 CMD ["python", "./services/api_gateway.py"]

@@ -1,4 +1,6 @@
 
+import json
+
 from flask import jsonify, Blueprint, request,current_app
 from datetime import datetime
 import requests
@@ -6,16 +8,16 @@ import requests
 post_bp = Blueprint("post_bp", __name__)
 
 
-def Call_leader(cluster,url):
-  
-    redirect= False
-    if not cluster.local_node.is_leader():
-        leader_address=cluster.peers[cluster.leader_id].address # type: ignore
-        redirect=True
-        requests.request(method=request.method, url=f"https://{leader_address}/db/".join(url), json=request.json, timeout=2, **cluster.secure_args)
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307
-    if redirect:
-        return jsonify({"msg":f"leader address: {leader_address}" }), 307 # type: ignore
+def Call_leader(cluster,url,method):
+
+
+    leader=cluster.subleader_manager.global_leader               
+    node_data = {
+        "ip": leader.ip,
+        "hostname": leader.host,
+        "port": cluster.local_node.port,
+    } 
+    return cluster.utils.Remote_Comunicate(method, url, node_data, cluster.secure_args,json= request.json)
 
 def Save_Wallog(cluster, WALLog,operation, post,session):
     lsn = cluster.next_lsn()
@@ -34,8 +36,7 @@ def Save_Wallog(cluster, WALLog,operation, post,session):
         
     session.add(wal)
     session.commit()
-    cluster.replicate_to_followers(wal)
-    
+    cluster.subleader_manager.relay_replication(wal)
     
 @post_bp.route("/db/posts", methods=["POST"])
 def create_post():
@@ -43,11 +44,12 @@ def create_post():
     cluster = current_app.config["cluster"]
     WALLog = current_app.config["WALLog"]
     Post = current_app.config["Post"]
-    User = current_app.config["User"]
+
+    
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,"/db/posts","POST")
     
     data = request.get_json()
-    
-    Call_leader(cluster,"post")
     
     session=cluster.database.get_session()
     post_id=cluster.database.generate_post_id(session)
@@ -69,8 +71,6 @@ def list_posts():
         cluster= current_app.config["cluster"]
         Post = current_app.config["Post"]
         
-        Call_leader(cluster,"posts")
-        
         session = cluster.database.get_session()
         try:
             posts = session.query(Post).all()
@@ -82,8 +82,6 @@ def list_posts():
 def get_post(post_id):
     cluster= current_app.config["cluster"]
     Post = current_app.config["Post"]
-      
-    Call_leader(cluster,f"posts/{post_id}")
     
     session = cluster.database.get_session()
     try:
@@ -98,8 +96,6 @@ def get_post(post_id):
 def get_user_posts(user_id):
     cluster= current_app.config["cluster"]
     Post = current_app.config["Post"]
-    
-    Call_leader(cluster,f"posts/{user_id}")
    
     session = cluster.database.get_session()
     try:
@@ -117,9 +113,10 @@ def update_post(post_id):
     WALLog = current_app.config["WALLog"]
     Post = current_app.config["Post"]
     
-    data = request.get_json()
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,f"/db/posts/{post_id}","PUT")
     
-    Call_leader(cluster,f"posts/{post_id}")
+    data = request.get_json()
     
     session = cluster.database.get_session()
     try:
@@ -143,7 +140,9 @@ def delete_post(post_id):
     WALLog = current_app.config["WALLog"]
     Post = current_app.config["Post"]
     
-    Call_leader(cluster,f"posts/{post_id}")
+    
+    if not cluster.local_node.is_leader():
+        return Call_leader(cluster,f"/db/posts/{post_id}","DELETE")
     
     session = cluster.database.get_session()
     

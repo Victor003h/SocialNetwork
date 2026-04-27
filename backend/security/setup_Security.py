@@ -1,5 +1,6 @@
 import os
 import shutil
+from typing import Self
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -123,6 +124,60 @@ class SecuritySetup:
             else:
                 f.write(obj.public_bytes(serialization.Encoding.PEM))
 
+    def generate_infra_kit(self, infra_name):
+        """
+        Genera certificados para componentes de infraestructura (Directory/Representative).
+        Usa SANs para permitir que sean contactados por nombre de servicio.
+        """
+        if not self.ca_cert or not self.ca_key:
+            raise Exception("CA no inicializada.")
+         
+        key = rsa.generate_private_key(65537, 2048, default_backend())
+        
+        # SANs: Incluimos el nombre del servicio y wildcards para flexibilidad en Swarm
+        san = x509.SubjectAlternativeName([
+            x509.DNSName(infra_name),
+            x509.DNSName(f"*.{infra_name}"),
+            x509.DNSName("localhost"),
+            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
+        ])
+    
+        subject = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, f"infra-{infra_name}.socialnet")
+        ])
+    
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            self.ca_cert.subject
+        ).public_key(
+            key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.utcnow()
+        ).not_valid_after(
+            datetime.utcnow() + timedelta(days=365)
+        ).add_extension(
+            san, critical=False
+        ).add_extension(
+            # Permitir tanto uso como servidor (HTTPS) como cliente (mTLS)
+            x509.ExtendedKeyUsage([
+                ExtendedKeyUsageOID.SERVER_AUTH,
+                ExtendedKeyUsageOID.CLIENT_AUTH
+            ]), critical=False
+        ).sign(self.ca_key, hashes.SHA256(), default_backend())
+    
+        infra_dir =  os.path.join(self.base_dir, f"{infra}_certs")
+        os.makedirs(infra_dir, exist_ok=True)
+        
+        # Guardar archivos (usando nombres estándar para que CertManager los cargue)
+        setup._save_pem(infra_dir, "node.crt", cert)
+        setup._save_pem(infra_dir, "node.key", key, is_private=True)
+        shutil.copy(os.path.join(self.base_dir, "ca.crt"), os.path.join(infra_dir, "ca.crt"))
+        
+
+
 if __name__ == "__main__":
     # Limpieza previa
     if os.path.exists("/backend/deploy_certs"):
@@ -131,8 +186,12 @@ if __name__ == "__main__":
     setup = SecuritySetup()
     setup.generate_ca()
     
-    # Generar kits para 5 nodos (ajustar según necesidad)
+    # Generar kits para  nodos 
     for i in range(1, 6):
         setup.generate_node_kit(i)
-        
+    
+    # Generar Kits para Infraestructura
+    for infra in ["directory", "representative"]:
+        setup.generate_infra_kit(infra)
+     
     print("\n🚀 Seguridad Inicializada. Monta ./deploy_certs/node_X en /app/certs en tus contenedores.")

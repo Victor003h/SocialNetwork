@@ -28,7 +28,7 @@ docker network create --driver overlay --attachable  cluster_net
 
 ```
 
-## 1️⃣ Levantar los nodos de base de datos Postgres
+## 2 Levantar los nodos de base de datos Postgres
 
 Uno por cada nodo levantado
 Cambiar --name :db2-postgress ,...
@@ -46,18 +46,45 @@ docker run  -d \
 
 ```
 
+```bash
+docker run  -d \
+            --name db2-postgres \
+            --network cluster_net \
+            -e POSTGRES_USER=admin \
+            -e POSTGRES_PASSWORD=secret \
+            -e POSTGRES_DB=cluster_db \
+            -v db2_data:/var/lib/postgresql/data \
+            postgres:14
+
+
+```
+
+```bash
+docker run  -d \
+            --name db3-postgres \
+            --network cluster_net \
+            -e POSTGRES_USER=admin \
+            -e POSTGRES_PASSWORD=secret \
+            -e POSTGRES_DB=cluster_db \
+            -v db3_data:/var/lib/postgresql/data \
+            postgres:14
+
+
+```
+
 ## 3️⃣ Build de la imagen del nodo de cluster DB
 
 Desde Backend/Node
 
 ```bash
-docker build -f Dockerfile.version1 -t  db_cluster_node .
+docker build -f ./Nodes/Dockerfile.version1 -t  db_cluster_node .
 
 ```
 
 ## 4️⃣ Levantar los nodos del cluster DB (control + lógica)
 
-A cada nodo le correspode un POSTGRES_HOST
+A cada nodo le correspode un POSTGRES_HOST y el id de la pc debe ser unico para cada
+nuevo ordenador
 
 Node 1:
 
@@ -71,6 +98,7 @@ docker run  -d \
             -e NODE_ID=1 \
             -e NODE_PORT=5000 \
             -e POSTGRES_HOST=db1-postgres \
+            -e NODE_PC_ID=1 \
             -e SERVICE_NAME=cl_service   db_cluster_node
 
 ```
@@ -87,11 +115,28 @@ docker run   -d  \
             -e NODE_ID=2 \
             -e NODE_PORT=5000 \
             -e POSTGRES_HOST=db2-postgres \
+            -e NODE_PC_ID=1 \
             -e SERVICE_NAME=cl_service   db_cluster_node
+
 
 ```
 
-Node 3 : similar
+Node 3:
+
+```bash
+docker run   -d  \
+            --name node3 \
+            --hostname node3.cluster_net \
+            --network cluster_net  \
+            --network-alias cluster_net_serv \
+            -v "$(pwd)/deploy_certs/node_3:/app/certs" \
+            -e NODE_ID=3 \
+            -e NODE_PORT=5000 \
+            -e POSTGRES_HOST=db3-postgres \
+            -e NODE_PC_ID=1 \
+            -e SERVICE_NAME=cl_service   db_cluster_node
+
+```
 
 ## 5️⃣ Verificar estado del cluster
 
@@ -108,7 +153,7 @@ docker logs -f node3
 En backend/services/api_services
 
 ```bash
-docker build -f ./services/Dockerfile -t api_services
+docker build -f ./services/Dockerfile -t api_services .
 
 ```
 
@@ -118,7 +163,7 @@ docker run  -d  \
             --hostname node4.cluster_net \
             --network cluster_net \
             -v "$(pwd)/deploy_certs/node_4:/app/certs" \
-            -p 8080: 8080  \
+            -p 7000:7000  \
             -e JWT_SECRET_KEY=supersecretkey   api_services
 
 ```
@@ -129,7 +174,7 @@ en Frontend/
 
 ```bash
 
-docker build -f ./Dockerfile -t web_app
+docker build -f ./Dockerfile -t web_app .
 
 ```
 
