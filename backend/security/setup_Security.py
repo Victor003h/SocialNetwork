@@ -168,12 +168,12 @@ class SecuritySetup:
             ]), critical=False
         ).sign(self.ca_key, hashes.SHA256(), default_backend())
     
-        infra_dir =  os.path.join(self.base_dir, f"{infra}_certs")
+        infra_dir =  os.path.join(self.base_dir, f"{infra_name}_certs")
         os.makedirs(infra_dir, exist_ok=True)
-        
+
         # Guardar archivos (usando nombres estándar para que CertManager los cargue)
-        setup._save_pem(infra_dir, "node.crt", cert)
-        setup._save_pem(infra_dir, "node.key", key, is_private=True)
+        self._save_pem(infra_dir, "node.crt", cert)
+        self._save_pem(infra_dir, "node.key", key, is_private=True)
         shutil.copy(os.path.join(self.base_dir, "ca.crt"), os.path.join(infra_dir, "ca.crt"))
         
 
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     setup.generate_ca()
     
     # Generar kits para  nodos 
-    for i in range(1, 6):
+    for i in range(1, 10):
         setup.generate_node_kit(i)
     
     # Generar Kits para Infraestructura

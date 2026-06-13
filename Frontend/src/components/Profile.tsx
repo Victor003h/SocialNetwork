@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { profileService } from "../services/ProfileService";
 import { UserProfile, ProfileUpdateData } from "../types/profile.types";
+import PostsListModal from "./PostsListModal";
+import FollowersListModal from "./FollowersListModal";
 
-const ProfileSection: React.FC = () => {
+interface ProfileSectionProps {
+  onLogout: () => void;
+}
+
+const ProfileSection: React.FC<ProfileSectionProps> = ({ onLogout }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showPosts, setShowPosts] = useState(false);
+  const [showFollowers, setShowFollowers] = useState(false);
 
   // Estado para el formulario de edición
   const [editData, setEditData] = useState({
@@ -125,22 +133,41 @@ const ProfileSection: React.FC = () => {
       ) : (
         <div className="view-mode">
           <div className="stats-row d-flex justify-content-around py-3 bg-black rounded mb-4">
-            <div className="text-center">
+            <button
+              className="text-center btn btn-link text-white text-decoration-none"
+              onClick={() => setShowPosts(true)}
+            >
               <h4 className="fw-bold mb-0">{profile?.postCount}</h4>
               <small className="text-muted">POSTS</small>
-            </div>
-            <div className="text-center">
+            </button>
+            <button
+              className="text-center btn btn-link text-white text-decoration-none"
+              onClick={() => setShowFollowers(true)}
+            >
               <h4 className="fw-bold mb-0">{profile?.followerCount}</h4>
               <small className="text-muted">SEGUIDORES</small>
-            </div>
+            </button>
           </div>
           <button
-            className="btn btn-outline-primary w-100"
+            className="btn btn-outline-primary w-100 mb-2"
             onClick={() => setIsEditing(true)}
           >
             Configuración de Cuenta
           </button>
+          <button className="btn btn-outline-danger w-100" onClick={onLogout}>
+            <i className="bi bi-box-arrow-right me-2"></i>Cerrar sesión
+          </button>
         </div>
+      )}
+
+      {showPosts && profile && (
+        <PostsListModal
+          userId={profile.id}
+          onClose={() => setShowPosts(false)}
+        />
+      )}
+      {showFollowers && (
+        <FollowersListModal onClose={() => setShowFollowers(false)} />
       )}
     </div>
   );

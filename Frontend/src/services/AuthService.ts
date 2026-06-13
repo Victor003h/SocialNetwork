@@ -65,5 +65,13 @@ export const authService = {
     getCurrentUser: () => {
         const user = localStorage.getItem('user_info');
         return user ? JSON.parse(user) : null;
+    },
+
+    isAdmin: (): boolean => {
+        const adminUser = import.meta.env.VITE_ADMIN_USER;
+        if (!adminUser) return false;
+        const user = localStorage.getItem('user_info');
+        const parsed = user ? JSON.parse(user) : null;
+        return parsed?.username === adminUser;
     }
 };

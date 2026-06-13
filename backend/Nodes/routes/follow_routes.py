@@ -11,20 +11,24 @@ def Call_leader(cluster,url,method):
   
 
     print("redirigiendo al lider")
-    leader=cluster.subleader_manager.global_leader               
+    leader = cluster.subleader_manager.get_global_leader()
+    if leader is None:
+        return jsonify({"error": "global leader unavailable"}), 503
     node_data = {
         "ip": leader.ip,
         "hostname": leader.host,
         "port": cluster.local_node.port,
-    } 
+    }
     return cluster.utils.Remote_Comunicate(method, url, node_data, cluster.secure_args,json= request.json)
     
 def Save_Wallog(cluster, WALLog,operation,table_name,follower,session):
     lsn = cluster.next_lsn()
+    epoch = cluster.current_epoch
     wal=WALLog(
-    wal_id=f"{cluster.local_node.node_id}:{lsn}",
+    wal_id=f"{cluster.local_node.node_id}:{epoch}:{lsn}",
     node_id=cluster.local_node.node_id,
     lsn=lsn,
+    epoch=epoch,
     operation=operation,
     table_name=table_name,
     entity_id=str(follower.id),
@@ -35,7 +39,13 @@ def Save_Wallog(cluster, WALLog,operation,table_name,follower,session):
         session.delete(follower)
     session.add(wal)
     session.commit()
-    session.refresh(follower)
+    # Tras un DELETE la fila ya no existe: refrescar el objeto borrado lanza
+    # InvalidRequestError (causaba el 500 aunque el borrado SÍ se aplicaba). Solo
+    # refrescamos en INSERT/UPDATE (donde interesa el id/estado generado).
+    if operation != "DELETE":
+        session.refresh(follower)
+    # El relay debe ejecutarse SIEMPRE (incl. DELETE) para que los followers reciban
+    # el WAL de borrado y no diverjan.
     cluster.subleader_manager.relay_replication(wal)
 
 
@@ -85,18 +95,21 @@ def delete_follow():
     
     session = cluster.database.get_session()
     try:
-        # 1. Buscamos en la tabla de asociación los IDs que sigue este usuario
-        follows = session.query(Follower).filter(
-            Follower.follower_id ==  follower and
-            Follower.followed_id ==  folled
-        ).all()
-        
-        print(len(follows))
-        if not follows:
+        # 1. Buscamos la relación concreta (follower -> followed). Nota: hay que pasar
+        # las condiciones como argumentos separados del filter; un `and` de Python entre
+        # expresiones SQLAlchemy lanza TypeError (booleano no definido) y rompía el unfollow.
+        follow = session.query(Follower).filter(
+            Follower.follower_id == follower,
+            Follower.followed_id == folled
+        ).first()
+
+        if not follow:
             return jsonify({"error": f"Follows relations between follower :{follower} and folloed :{folled} not found"}), 404
-        
-        Save_Wallog(cluster,WALLog,"DELETE","follows",follows,session) 
-        
+
+        # Save_Wallog espera UN objeto (hace .id / to_dict / session.delete sobre él),
+        # no una lista; antes se le pasaba .all() y también fallaba.
+        Save_Wallog(cluster,WALLog,"DELETE","follows",follow,session)
+
         return jsonify({"status": "deleted"}), 200
     
     except Exception as e:

@@ -1,0 +1,150 @@
+[INIT] Local node created: <Node id=1 service=cl_service address=node1.cluster_net:5000 role=unknown>
+[CertManager] Security Kit loaded from certs
+[INIT] ClusterContext initialized
+[DISCOVERY] Discovering peers...
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.6', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.6', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.5', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.5', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+[DISCOVERY] intento 1/5: sin peers todavía, reintentando...
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.5', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.5', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.6', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.6', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+[DISCOVERY] intento 2/5: sin peers todavía, reintentando...
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.6', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.6', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.5', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.5', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+[DISCOVERY] intento 3/5: sin peers todavía, reintentando...
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.5', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.5', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.6', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.6', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+[DISCOVERY] intento 4/5: sin peers todavía, reintentando...
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.5', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.5', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+❌ Error de conexión: HTTPSConnectionPool(host='172.20.0.6', port=5000): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPSConnection(host='172.20.0.6', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+[DISCOVERY] intento 5/5: sin peers todavía, reintentando...
+[DISCOVERY] Peers found: 0
+[DISCOVERY] Notifying my existence
+[READY] Node ready for subleader election
+<ClusterContext local=1 peers=0 leader=-1>
+ subleader not found
+[HEARTBEAT] Node 1 started
+[subleader] Node 1 is now a subleader.
+[GATEWAY] No se pudo resolver api_services: [Errno -3] Temporary failure in name resolution
+[DISCOVERY] Topology discovered: []
+[LEADERSHIP] Checking for global leader among 0 PCs
+[LEADERSHIP] No global leader found, starting election among subleaders
+[ELECTION] Node 1 starting election
+[leader] Node 1 became leader
+[LEADER] Nuevo epoch global: 1
+[START] Control server running on port 5000
+ * Serving Flask app 'main'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on https://127.0.0.1:5000
+ * Running on https://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [13/Jun/2026 22:34:35] "GET /health HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:34:36] "GET /db/subleader_address HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:34:37] "GET /info HTTP/1.1" 200 -
+Host encontrado:
+node1.cluster_net
+172.20.0.7
+Host encontrado:
+node1.cluster_net
+node1.cluster_net:5000
+Host encontrado:
+node1.cluster_net
+172.20.0.7
+Host encontrado:
+node1.cluster_net
+node1.cluster_net:5000
+[BOOTSTRAP] Multi-líder detectado; el mayor id 3 gana
+[BOOTSTRAP] Nodo 1 cede liderazgo a 3; me vuelvo follower
+172.20.0.6 - - [13/Jun/2026 22:34:37] "GET /info HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390078.050017}
+172.20.0.5 - - [13/Jun/2026 22:34:38] "POST /heartbeat HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:34:39] "GET /info HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390080.1208658}
+172.20.0.5 - - [13/Jun/2026 22:34:40] "POST /heartbeat HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:34:41] "GET /info HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390082.182532}
+172.20.0.5 - - [13/Jun/2026 22:34:42] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390084.2333941}
+172.20.0.5 - - [13/Jun/2026 22:34:44] "POST /heartbeat HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:34:45] "GET /health HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390086.2841837}
+172.20.0.5 - - [13/Jun/2026 22:34:46] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390088.345084}
+172.20.0.5 - - [13/Jun/2026 22:34:48] "POST /heartbeat HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:34:48] "POST /replicate HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390090.4344575}
+172.20.0.5 - - [13/Jun/2026 22:34:50] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390092.4855437}
+172.20.0.5 - - [13/Jun/2026 22:34:52] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390094.5487905}
+172.20.0.5 - - [13/Jun/2026 22:34:54] "POST /heartbeat HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:34:55] "GET /health HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:34:56] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390096.6013114}
+127.0.0.1 - - [13/Jun/2026 22:34:56] "GET /info HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:34:58] "POST /replicate HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390098.6784806}
+172.20.0.5 - - [13/Jun/2026 22:34:58] "POST /heartbeat HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:35:00] "POST /replicate HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:35:00] "POST /replicate HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390100.7592566}
+172.20.0.5 - - [13/Jun/2026 22:35:00] "POST /heartbeat HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:35:01] "POST /replicate HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:35:01] "POST /replicate HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:35:02] "POST /replicate HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390102.8256743}
+172.20.0.5 - - [13/Jun/2026 22:35:02] "POST /heartbeat HTTP/1.1" 200 -
+172.20.0.5 - - [13/Jun/2026 22:35:04] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390104.895977}
+127.0.0.1 - - [13/Jun/2026 22:35:05] "GET /health HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390106.9499707}
+172.20.0.5 - - [13/Jun/2026 22:35:06] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390109.0026186}
+172.20.0.5 - - [13/Jun/2026 22:35:09] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 3, 'timestamp': 1781390111.0763147}
+172.20.0.5 - - [13/Jun/2026 22:35:11] "POST /heartbeat HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:12] "GET /info HTTP/1.1" 200 -
+[SYNC] subleader 3 inalcanzable: HTTPSConnectionPool(host='node3.cluster_net', port=5000): Max retries exceeded with url: /sync (Caused by NameResolutionError("HTTPSConnection(host='node3.cluster_net', port=5000): Failed to resolve 'node3.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+127.0.0.1 - - [13/Jun/2026 22:35:14] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:16] "GET /health HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:16] "GET /info HTTP/1.1" 200 -
+[SYNC] subleader 3 inalcanzable: HTTPSConnectionPool(host='node3.cluster_net', port=5000): Max retries exceeded with url: /sync (Caused by NameResolutionError("HTTPSConnection(host='node3.cluster_net', port=5000): Failed to resolve 'node3.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+127.0.0.1 - - [13/Jun/2026 22:35:19] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:21] "GET /info HTTP/1.1" 200 -
+[SYNC] subleader 3 inalcanzable: HTTPSConnectionPool(host='node3.cluster_net', port=5000): Max retries exceeded with url: /sync (Caused by NameResolutionError("HTTPSConnection(host='node3.cluster_net', port=5000): Failed to resolve 'node3.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+[FailureDetector] subleader timeout detected
+[FailureDetector] Triggering leader election
+[FAILURE DETECTOR] Marked peer 3 as down
+[ELECTION] Node 1 starting election
+[HEARTBEAT] Node 1 started
+[subleader] Node 1 became subleader
+❌ node2.cluster_net no resuelve (nodo caído); se omite.
+[FAILURE DETECTOR] Marked peer 3 as down
+[subleader] Node 1 is now a subleader.
+[GATEWAY] Notificado a api: subleader = node1.cluster_net:5000
+[DISCOVERY] Topology discovered: []
+[LEADERSHIP] Checking for global leader among 0 PCs
+[LEADERSHIP] No global leader found, starting election among subleaders
+[ELECTION] Node 1 starting election
+[leader] Node 1 became leader
+[LEADER] Nuevo epoch global: 2
+127.0.0.1 - - [13/Jun/2026 22:35:23] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:23] "GET /info HTTP/1.1" 200 -

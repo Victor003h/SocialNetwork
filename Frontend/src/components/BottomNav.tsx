@@ -3,7 +3,7 @@ import React from "react";
 import { NavItem, BottomNavProps } from "../types/nav.types";
 // Definimos los IDs de las páginas disponibles para evitar errores de dedo
 
-const navItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
   {
     id: "feed",
     label: "Feed",
@@ -12,18 +12,6 @@ const navItems: NavItem[] = [
   },
   { id: "search", label: "Search", icon: "bi-search", activeIcon: "bi-search" },
   {
-    id: "alerts",
-    label: "Alerts",
-    icon: "bi-bell",
-    activeIcon: "bi-bell-fill",
-  },
-  {
-    id: "friends",
-    label: "Friends",
-    icon: "bi-people",
-    activeIcon: "bi-people-fill",
-  },
-  {
     id: "profile",
     label: "Profile",
     icon: "bi-person",
@@ -31,7 +19,19 @@ const navItems: NavItem[] = [
   },
 ];
 
-const BottomNav: React.FC<BottomNavProps> = ({ activePage, onPageChange }) => {
+const adminNavItem: NavItem = {
+  id: "admin",
+  label: "Admin",
+  icon: "bi-hdd-stack",
+  activeIcon: "bi-hdd-stack-fill",
+};
+
+const BottomNav: React.FC<BottomNavProps> = ({
+  activePage,
+  onPageChange,
+  showAdmin = false,
+}) => {
+  const navItems = showAdmin ? [...baseNavItems, adminNavItem] : baseNavItems;
   return (
     <nav className="navbar fixed-bottom navbar-dark bg-dark border-top border-secondary py-0">
       <div className="container-fluid justify-content-around">

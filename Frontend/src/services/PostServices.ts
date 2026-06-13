@@ -19,14 +19,19 @@ export const postService = {
     },
 
     getUserPost: async (): Promise<Post[]> => {
-        
+
         const user = getUser()
-        const res = await fetch(`${API_URL}/posts/user/${user.id}`, {
+        return postService.getUserPostsById(user.id);
+    },
+
+    // Posts de un usuario concreto (GET /posts/user/:id) — para popover y listas
+    getUserPostsById: async (user_id: number): Promise<Post[]> => {
+        const res = await fetch(`${API_URL}/posts/user/${user_id}`, {
             method: 'GET',
             headers: getAuthHeaders()
         });
-        if (!res.ok) throw new Error('Error al obtener el feed distribuido');
-        
+        if (!res.ok) throw new Error('Error al obtener los posts del usuario');
+
         return res.json();
     },
 

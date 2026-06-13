@@ -4,3 +4,5 @@
 *.pem
 *.crt
 *.key
+/.claude
+pruebas/Test_de_Ejecucion.mp4

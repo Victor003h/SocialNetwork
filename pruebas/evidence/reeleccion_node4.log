@@ -1,0 +1,93 @@
+=== Starting DB Cluster Node ===
+Host encontrado:
+node4.cluster_net
+172.20.0.6
+Host encontrado:
+node4.cluster_net
+node4.cluster_net:5000
+[INIT] Local node created: <Node id=4 service=cl_service address=node4.cluster_net:5000 role=unknown>
+[CertManager] Security Kit loaded from certs
+[INIT] ClusterContext initialized
+[DISCOVERY] Discovering peers...
+Host encontrado:
+node4.cluster_net
+172.20.0.6
+Host encontrado:
+node4.cluster_net
+node4.cluster_net:5000
+Host encontrado:
+node4.cluster_net
+172.20.0.6
+Host encontrado:
+node4.cluster_net
+node4.cluster_net:5000
+Host encontrado:
+node4.cluster_net
+172.20.0.6
+Host encontrado:
+node4.cluster_net
+node4.cluster_net:5000
+{3: <Node id=3 service=cl_service address=node3.cluster_net:5000 role=follower>, 2: <Node id=2 service=cl_service address=node2.cluster_net:5000 role=leader>, 1: <Node id=1 service=cl_service address=node1.cluster_net:5000 role=leader>}
+[DISCOVERY] Peers found: 3
+  - Peer: node3.cluster_net:5000
+  - Peer: node2.cluster_net:5000
+  - Peer: node1.cluster_net:5000
+[DISCOVERY] Notifying my existence
+Notifinando a node2.cluster_net:5000
+[DISCOVERY] No se pudo notificar a node2.cluster_net:5000: HTTPSConnectionPool(host='node2.cluster_net', port=5000): Max retries exceeded with url: /newNode (Caused by NameResolutionError("HTTPSConnection(host='node2.cluster_net', port=5000): Failed to resolve 'node2.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+Notifinando a node1.cluster_net:5000
+[READY] Node ready for subleader election
+<ClusterContext local=4 peers=3 leader=1>
+Found subleader :1
+[START] Control server running on port 5000
+ * Serving Flask app 'main'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on https://127.0.0.1:5000
+ * Running on https://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 1, 'timestamp': 1781390132.555539}
+172.20.0.7 - - [13/Jun/2026 22:35:32] "POST /heartbeat HTTP/1.1" 200 -
+[HEARTBEAT] Received from subleader
+[HEARTBEAT] Last heartbeat {'id': 1, 'timestamp': 1781390134.5940056}
+172.20.0.7 - - [13/Jun/2026 22:35:34] "POST /heartbeat HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:35] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:35] "GET /health HTTP/1.1" 200 -
+[SYNC] subleader 1 inalcanzable: HTTPSConnectionPool(host='node1.cluster_net', port=5000): Max retries exceeded with url: /sync (Caused by NameResolutionError("HTTPSConnection(host='node1.cluster_net', port=5000): Failed to resolve 'node1.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+127.0.0.1 - - [13/Jun/2026 22:35:37] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:40] "GET /info HTTP/1.1" 200 -
+[SYNC] subleader 1 inalcanzable: HTTPSConnectionPool(host='node1.cluster_net', port=5000): Max retries exceeded with url: /sync (Caused by NameResolutionError("HTTPSConnection(host='node1.cluster_net', port=5000): Failed to resolve 'node1.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+127.0.0.1 - - [13/Jun/2026 22:35:42] "GET /info HTTP/1.1" 200 -
+[BOOTSTRAP] Reconciliación completa; rol estable = follower
+127.0.0.1 - - [13/Jun/2026 22:35:44] "GET /info HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:45] "GET /db/subleader_address HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:45] "GET /health HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:46] "GET /db/subleader_address HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:46] "GET /db/subleader_address HTTP/1.1" 200 -
+[SYNC] subleader 1 inalcanzable: HTTPSConnectionPool(host='node1.cluster_net', port=5000): Max retries exceeded with url: /sync (Caused by NameResolutionError("HTTPSConnection(host='node1.cluster_net', port=5000): Failed to resolve 'node1.cluster_net' ([Errno -3] Temporary failure in name resolution)"))
+[FailureDetector] subleader timeout detected
+[FailureDetector] Triggering leader election
+[FAILURE DETECTOR] Marked peer 1 as down
+[ELECTION] Node 4 starting election
+[subleader] Node 4 became subleader
+[HEARTBEAT] Node 4 started
+❌ node2.cluster_net no resuelve (nodo caído); se omite.
+[FAILURE DETECTOR] Marked peer 1 as down
+[subleader] Node 4 is now a subleader.
+[GATEWAY] Notificado a api: subleader = node4.cluster_net:5000
+127.0.0.1 - - [13/Jun/2026 22:35:47] "GET /info HTTP/1.1" 200 -
+[DISCOVERY] Topology discovered: []
+[LEADERSHIP] Checking for global leader among 0 PCs
+[LEADERSHIP] No global leader found, starting election among subleaders
+[ELECTION] Node 4 starting election
+[leader] Node 4 became leader
+[LEADER] Nuevo epoch global: 3
+172.20.0.8 - - [13/Jun/2026 22:35:47] "GET /db/subleader_address HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:48] "GET /info HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:48] "GET /info HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:48] "GET /info HTTP/1.1" 200 -
+172.20.0.8 - - [13/Jun/2026 22:35:48] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:49] "GET /info HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 22:35:49] "GET /info HTTP/1.1" 200 -

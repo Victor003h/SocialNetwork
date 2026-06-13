@@ -10,13 +10,11 @@ export interface User {
 }
 
 export interface Post {
-    id: string;
-    userId: string;
-    UserName: string; // En un sistema real, a veces esto viene "populado" o se busca aparte
+    id: number;
+    user_id: number;
+    UserName?: string; // El gateway lo "popula" en GET /posts; en /posts/user/:id puede no venir
     content: string;
-    created: string;
-    //likes: number;
-    //comments: number;
+    created_at: string;
 }
 
 export interface NewPostData {

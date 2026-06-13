@@ -13,6 +13,9 @@ class WALLog(Base):
     wal_id = Column(String, primary_key=True)
     node_id = Column(String, nullable=False)
     lsn = Column(Integer, nullable=False)
+    # Epoch (term) del leader global que originó la entrada. Junto con lsn forma
+    # la clave de orden global (epoch, lsn) usada para idempotencia y fencing.
+    epoch = Column(Integer, nullable=False, default=0)
 
     operation = Column(String, nullable=False)
     table_name = Column(String, nullable=False)
@@ -32,6 +35,7 @@ class WALLog(Base):
             "wal_id": self.wal_id,
             "node_id": self.node_id,
             "lsn": self.lsn,
+            "epoch": self.epoch,
             "operation": self.operation,
             "table_name": self.table_name,
             "entity_id": self.entity_id,

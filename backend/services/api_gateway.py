@@ -1,4 +1,5 @@
 import ssl
+import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
@@ -39,7 +40,10 @@ app.config["JWT_SECRET_KEY"]=JWT_SECRET_KEY
 def check_auth():
     # Rutas públicas
     
-    if request.path.startswith("/auth") or request.path == "/" or request.method == "OPTIONS":
+    # /cluster: canal interno por el que el subleader se registra (push). No lleva
+    # JWT (lo invoca un nodo del cluster, no el navegador) -> ruta pública.
+    if request.path.startswith("/auth") or request.path.startswith("/cluster") \
+       or request.path == "/" or request.method == "OPTIONS":
         return
     print(f"DEBUG: Headers recibidos: {dict(request.headers)}")
     
@@ -61,6 +65,54 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(user_bp)
 app.register_blueprint(post_bp)
 app.register_blueprint(follow_bp)
+
+# --- Presencia en la web (efímera, en memoria del gateway) ---
+# Mapa user_id -> last_seen (epoch). "Online" = visto dentro de PRESENCE_TTL.
+PRESENCE_TTL = 30  # segundos
+_presence = {}
+
+
+@app.route("/presence/ping", methods=["POST"])
+def presence_ping():
+    """Heartbeat del navegador: marca al usuario autenticado como conectado."""
+    user_id = getattr(request, "user", {}).get("user_id")
+    if user_id is None:
+        return jsonify({"error": "Missing user"}), 401
+    _presence[user_id] = time.time()
+    return jsonify({"ok": True}), 200
+
+
+@app.route("/presence/online", methods=["GET"])
+def presence_online():
+    """Lista de user_id conectados (last_seen dentro de la ventana)."""
+    now = time.time()
+    online = [uid for uid, ts in list(_presence.items()) if now - ts <= PRESENCE_TTL]
+    return jsonify({"online": online}), 200
+
+
+@app.route("/cluster/status", methods=["GET"])
+def cluster_status():
+    """Observabilidad read-only del clúster: reenvía el cluster.to_dict() que
+    publica el subleader vigente (endpoint /info de los nodos). Se usa en el
+    panel admin de la web para ver nodos y roles, y reflejar el failover."""
+    try:
+        res = tools.call_cluster("GET", "/info")
+        return jsonify(res.json()), res.status_code
+    except Exception as e:
+        return jsonify({"error": "Clúster no disponible", "details": str(e)}), 503
+
+
+@app.route("/cluster/subleader", methods=["POST"])
+def register_subleader():
+    """Push del cluster: el subleader vigente del grupo se anuncia y la api fija
+    a quién dirigir todas sus peticiones. Se invoca en cada (re)elección de
+    subleader (arranque y failover)."""
+    data = request.get_json(silent=True) or {}
+    if not data.get("address"):
+        return jsonify({"error": "address requerido"}), 400
+    tools.set_leader({"address": data.get("address"), "ip": data.get("ip")})
+    return jsonify({"status": "ok"}), 200
+
 
 @app.route("/")
 def health():

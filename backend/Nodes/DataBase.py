@@ -43,6 +43,20 @@ class Database:
 
         session.close()
     
+    def get_watermark(self):
+        """Devuelve el watermark durable (epoch, lsn) derivado del propio WAL.
+
+        Se usa al arrancar para reconstruir el estado de orden global sin necesidad
+        de una tabla de metadatos aparte.
+        """
+        session = self.get_session()
+        try:
+            epoch = session.query(func.max(WALLog.epoch)).scalar() or 0
+            lsn = session.query(func.max(WALLog.lsn)).scalar() or 0
+            return epoch, lsn
+        finally:
+            session.close()
+
     def get_session(self):
         return self.SessionLocal()
 

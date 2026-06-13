@@ -1,0 +1,227 @@
+\documentclass[11pt]{article}
+\usepackage{fontspec}
+\setmainfont{DejaVu Serif}
+\setmonofont{DejaVu Sans Mono}[Scale=0.85]
+\usepackage{polyglossia}
+\setdefaultlanguage{spanish}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=1.3em,topsep=2pt}
+\definecolor{codebg}{gray}{0.96}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, columns=fullflexible,
+  xleftmargin=4pt, framexleftmargin=4pt,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1 {§}{{\S}}1
+}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{12pt}{4pt}
+\titlespacing*{\subsection}{0pt}{8pt}{3pt}
+\begin{document}
+\section*{Informe Técnico — Red Social sobre Cluster de Base de Datos Distribuido}
+
+\textbf{Sistemas Distribuidos} · Proyecto final
+
+Autores: Victor Hugo Pacheco Fonseca (C411) · José Agustín del Toro (C412)
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{1. Introducción}
+
+El proyecto implementa una \textbf{red social} (usuarios, posts, follows) cuya capa de datos es un \textbf{cluster de base de datos distribuido, jerárquico y tolerante a fallos}. El objetivo es garantizar disponibilidad y no pérdida de datos ante caídas de nodos, manteniendo una arquitectura sencilla y reproducible.
+
+El sistema se compone de:
+
+\begin{itemize}
+\item \textbf{Nodos de estado} (\texttt{backend/\allowbreak{}Nodes/\allowbreak{}}): cada uno con su propio Postgres; coordinan liderazgo, replicación y tolerancia a fallos.
+\item \textbf{API Gateway} (\texttt{backend/\allowbreak{}services/\allowbreak{}}): servicio \emph{stateless} que encapsula los endpoints de negocio consumidos por el frontend y los traduce a llamadas al cluster.
+\item \textbf{Frontend} (\texttt{Frontend/\allowbreak{}}): aplicación web.
+\end{itemize}
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.1 Arquitectura y roles}
+
+Topología \textbf{jerárquica de dos niveles}:
+
+\begin{itemize}
+\item \textbf{follower}: réplica de solo lectura; conoce a su subleader y aplica el WAL que recibe.
+\item \textbf{subleader}: líder de su PC (\texttt{NODE\_\allowbreak{}PC\_\allowbreak{}ID}). Punto de contacto del API Gateway: sirve lecturas y reenvía escrituras al leader global.
+\item \textbf{leader (global)}: elegido entre los subleaders; dueño del camino de escritura. Propaga el WAL a sus followers locales y, en multi-PC, a los demás subleaders (\texttt{Subleader\_\allowbreak{}manager.\allowbreak{}relay\_\allowbreak{}replication}).
+\end{itemize}
+
+En un despliegue de \textbf{un PC} (caso de la prueba §5) el subleader es inmediatamente el leader global.
+
+El estado del cluster vive en \texttt{ClusterContext} (\texttt{backend/\allowbreak{}Nodes/\allowbreak{}cluster.\allowbreak{}py}): \texttt{peers}, \texttt{subleader\_\allowbreak{}id}, \texttt{current\_\allowbreak{}epoch}, \texttt{last\_\allowbreak{}applied\_\allowbreak{}lsn}, \texttt{read\_\allowbreak{}only}. El nodo se modela en \texttt{node.\allowbreak{}py} (\texttt{Node}, con \texttt{role}, \texttt{alive}, \texttt{node\_\allowbreak{}id}, \texttt{node\_\allowbreak{}pc\_\allowbreak{}id}).
+
+\textbf{Despliegue en dos redes Docker} (\texttt{docker-compose.\allowbreak{}cluster.\allowbreak{}yml}):
+
+\begin{itemize}
+\item \texttt{edge\_\allowbreak{}net} (expuesta): frontend (8080) y API Gateway (7000) — únicos puertos al host.
+\item \texttt{cluster\_\allowbreak{}net} (\texttt{internal:\allowbreak{} true}, \textbf{aislada} sin acceso al host ni a internet): nodos + Postgres + gateway (que la usa solo para alcanzar a los nodos). Esto materializa la \textbf{frontera de confianza}.
+\end{itemize}
+
+\textbf{Volúmenes y persistencia}: cada Postgres tiene su \textbf{volumen nombrado} dedicado (\texttt{dbN\_\allowbreak{}data:\allowbreak{}/\allowbreak{}var/\allowbreak{}lib/\allowbreak{}postgresql/\allowbreak{}data}), de modo que el estado de cada nodo es independiente y sobrevive a reinicios del contenedor; \texttt{make down -v} los elimina para volver a un estado limpio reproducible. Los certificados mTLS se montan \textbf{solo-lectura} por nodo (\texttt{.\allowbreak{}/\allowbreak{}backend/\allowbreak{}deploy\_\allowbreak{}certs/\allowbreak{}node\_\allowbreak{}N:\allowbreak{}/\allowbreak{}app/\allowbreak{}certs:\allowbreak{}ro}).
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.2 Concurrencia (organización interna multihilo)}
+
+Cada nodo es un proceso con \textbf{múltiples hilos}:
+
+\begin{itemize}
+\item El \textbf{servidor de control} Flask (\texttt{main.\allowbreak{}py:\allowbreak{}create\_\allowbreak{}app}) sirve los endpoints sobre HTTPS; atiende peticiones concurrentes.
+\item \textbf{HeartbeatSender} (\texttt{HeartbeatSender.\allowbreak{}py}): hilo \emph{daemon} que emite latidos periódicos (subleader→followers, leader→subleaders) con \texttt{threading.\allowbreak{}Event} para parada limpia.
+\item \textbf{FailureDetector} (\texttt{Failure\_\allowbreak{}Detector.\allowbreak{}py}): hilo \emph{daemon} que vigila el latido del líder y, además, ejecuta \textbf{anti-entropía} (un \texttt{/\allowbreak{}sync} incremental por ciclo).
+\item \textbf{Hilo de bootstrap} (\texttt{main.\allowbreak{}py}): ejecuta la reconciliación de liderazgo tras el arranque.
+\end{itemize}
+
+El acceso a Postgres usa \textbf{una sesión por operación} (\texttt{Database.\allowbreak{}get\_\allowbreak{}session()}), evitando estado mutable compartido entre hilos a nivel de conexión. Los hilos \texttt{start()/\allowbreak{}stop()} son idempotentes.
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.3 Comunicación}
+
+\begin{itemize}
+\item \textbf{Protocolo}: REST sobre \textbf{HTTPS} entre todos los componentes.
+\item \textbf{mTLS} (\texttt{backend/\allowbreak{}security/\allowbreak{}}): una CA raíz (\texttt{setup\_\allowbreak{}Security.\allowbreak{}py}) firma un kit por nodo (\texttt{node.\allowbreak{}crt/\allowbreak{}.\allowbreak{}key} + \texttt{ca.\allowbreak{}crt}). El servidor de cada nodo exige certificado de cliente (\texttt{CertManager.\allowbreak{}get\_\allowbreak{}mtls\_\allowbreak{}context}, \texttt{CERT\_\allowbreak{}REQUIRED}): solo nodos del cluster se comunican entre sí.
+\item \textbf{SNI pinning}: como los nodos se contactan por IP (resuelta vía DNS de Docker) pero el certificado está emitido para el nombre \texttt{nodeN.\allowbreak{}cluster\_\allowbreak{}net}, se usa un \texttt{HostHeaderSSLAdapter} (\texttt{node\_\allowbreak{}utils.\allowbreak{}Remote\_\allowbreak{}Comunicate}) que fija el hostname esperado del certificado.
+\item \textbf{Timeouts acotados} en todas las llamadas a vecinos (\texttt{Remote\_\allowbreak{}Comunicate}, \texttt{General\_\allowbreak{}Endpoint}, \texttt{call\_\allowbreak{}cluster}): una llamada a un nodo caído falla rápido en vez de bloquear el hilo.
+\end{itemize}
+
+El \textbf{API Gateway} habla con el cluster también por mTLS (\texttt{services/\allowbreak{}utils.\allowbreak{}call\_\allowbreak{}cluster}), dirigiéndose siempre al \textbf{subleader} vigente.
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.4 Coordinación (elección de líder)}
+
+\textbf{Algoritmo Bully en dos capas}:
+
+\begin{itemize}
+\item \textbf{Local (por PC)}: ante la caída del subleader, los nodos eligen al de \textbf{mayor \texttt{node\_\allowbreak{}id}} (\texttt{cluster.\allowbreak{}start\_\allowbreak{}election} → \texttt{become\_\allowbreak{}leader}).
+\item \textbf{Global (entre subleaders)}: el subleader, al asumir, descubre otros PCs (\texttt{Subleader\_\allowbreak{}manager.\allowbreak{}discover\_\allowbreak{}global\_\allowbreak{}topology}) y, si no hay leader global, dispara elección entre subleaders (\texttt{check\_\allowbreak{}global\_\allowbreak{}leadership}).
+\end{itemize}
+
+\textbf{Epoch (term)}: cada vez que un nodo gana el liderazgo global incrementa y "persiste" el \texttt{epoch} (\texttt{become\_\allowbreak{}leader}, derivado del WAL durable vía \texttt{Database.\allowbreak{}get\_\allowbreak{}watermark}). El epoch ordena globalmente las escrituras y habilita el \emph{fencing} (§2.6).
+
+\textbf{Quórum de liderazgo} (\texttt{has\_\allowbreak{}leadership\_\allowbreak{}quorum}): un aspirante a leader global solo asume el rol si alcanza \textbf{mayoría de los PCs esperados} (\texttt{EXPECTED\_\allowbreak{}PCS}); si no, entra en \textbf{modo solo-lectura} (\texttt{read\_\allowbreak{}only}). Con \texttt{EXPECTED\_\allowbreak{}PCS=1} (un PC) el quórum es trivial.
+
+\textbf{Convergencia de arranque} (\texttt{ensure\_\allowbreak{}single\_\allowbreak{}leader}): en un arranque simultáneo varios nodos pueden auto-promoverse a subleader a la vez. Tras el bootstrap, cada nodo sondea por \texttt{/\allowbreak{}info} a los nodos vivos de su PC y aplica Bully de forma determinista: el de mayor \texttt{node\_\allowbreak{}id} permanece como subleader único y el resto cede a follower (\texttt{step\_\allowbreak{}down\_\allowbreak{}to\_\allowbreak{}follower}) y re-sincroniza. Esto colapsa cualquier multi-líder transitorio a \textbf{exactamente un líder}.
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.5 Nombrado}
+
+\begin{itemize}
+\item \textbf{Identidad de nodo}: \texttt{NODE\_\allowbreak{}ID} (id lógico, criterio de Bully) y \texttt{NODE\_\allowbreak{}PC\_\allowbreak{}ID} (PC al que pertenece), por variables de entorno (\texttt{Node.\allowbreak{}from\_\allowbreak{}env}).
+\item \textbf{Identidad de entradas WAL}: \texttt{wal\_\allowbreak{}id = "\{node\_\allowbreak{}id\}:\allowbreak{}\{epoch\}:\allowbreak{}\{lsn\}"} (\texttt{models/\allowbreak{}wal.\allowbreak{}py}), con orden global por la tupla \texttt{(epoch, lsn)}.
+\item \textbf{Descubrimiento por DNS}: los nodos comparten el alias Docker \texttt{cluster\_\allowbreak{}net\_\allowbreak{}serv}; un nodo enumera a sus pares con \texttt{utils.\allowbreak{}get\_\allowbreak{}ips\_\allowbreak{}for\_\allowbreak{}alias} y obtiene la vista del cluster con \texttt{/\allowbreak{}info}. El gateway resuelve a los nodos por el mismo alias; el subleader vigente, además, \textbf{se anuncia} al gateway (\texttt{notify\_\allowbreak{}gateway} → \texttt{POST /\allowbreak{}cluster/\allowbreak{}subleader}).
+\end{itemize}
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.6 Consistencia y replicación (sección crítica)}
+
+\subsection{Modelo}
+
+\textbf{Consistencia eventual con single-writer leader y prevención de split-brain por epoch + quórum.}
+
+\begin{itemize}
+\item Las escrituras solo las acepta el \textbf{leader} (\texttt{/\allowbreak{}db/\allowbreak{}posts|users|follows} comprueban \texttt{is\_\allowbreak{}leader()}; si no, reenvían al leader). El leader asigna \texttt{lsn} monótono (\texttt{next\_\allowbreak{}lsn}) y registra un WAL con \texttt{(epoch, lsn)} (\texttt{Save\_\allowbreak{}Wallog}).
+\item La \textbf{replicación} es por WAL lógico: el leader confirma localmente y propaga \emph{best-effort} a los followers (\texttt{replicate\_\allowbreak{}to\_\allowbreak{}followers}) y a otros subleaders (\texttt{relay\_\allowbreak{}replication}); el subleader receptor re-replica a sus followers (\texttt{/\allowbreak{}replicate}). \textbf{Lectura propia garantizada en el leader}; el resto converge de forma eventual.
+\end{itemize}
+
+\subsection{Orden global y idempotencia}
+
+Toda entrada se ordena por la tupla \textbf{\texttt{(epoch, lsn)}}. Una única comparación lexicográfica (\texttt{is\_\allowbreak{}newer}) resuelve a la vez \textbf{idempotencia} (ignorar lo ya aplicado) y \textbf{fencing} (ignorar a un leader viejo de epoch inferior). El watermark \texttt{(current\_\allowbreak{}epoch, last\_\allowbreak{}applied\_\allowbreak{}lsn)} se reconstruye del WAL durable al arrancar (\texttt{Database.\allowbreak{}get\_\allowbreak{}watermark}), de modo que el orden sobrevive a reinicios.
+
+\subsection{Partición y split-brain — prevención (no solo documentación)}
+
+\begin{enumerate}
+\item \textbf{Fencing por epoch}: los heartbeats y \texttt{/\allowbreak{}replicate} llevan \texttt{epoch}. Un nodo \textbf{rechaza} mensajes con \texttt{epoch < current\_\allowbreak{}epoch} (\texttt{/\allowbreak{}heartbeat}, \texttt{/\allowbreak{}heartbeat\_\allowbreak{}leader} devuelven 409; \texttt{/\allowbreak{}replicate} ignora vía \texttt{is\_\allowbreak{}newer}). Un leader viejo que reaparece tras una partición queda \textbf{fenced} automáticamente: sus mensajes son descartados y su \texttt{adopt\_\allowbreak{}higher\_\allowbreak{}epoch} lo hace ceder a follower.
+\item \textbf{Quórum de liderazgo}: una partición minoritaria no alcanza mayoría de subleaders y entra en \textbf{solo-lectura} (\texttt{read\_\allowbreak{}only}), evitando un segundo leader que acepte escrituras.
+\item \textbf{Ventana de arranque}: el breve multi-líder posible durante el bootstrap se resuelve de forma determinista por \texttt{ensure\_\allowbreak{}single\_\allowbreak{}leader} (§2.4); el perdedor re-sincroniza el estado del ganador.
+\end{enumerate}
+
+\subsection{Reconciliación post-partición / reingreso}
+
+Al reintegrarse, un nodo compara su watermark \texttt{(epoch, lsn)} y hace \textbf{replay incremental} del WAL faltante vía \texttt{/\allowbreak{}sync} (\texttt{sync\_\allowbreak{}from\_\allowbreak{}leader}; el servidor devuelve todo lo posterior a \texttt{(from\_\allowbreak{}epoch, from\_\allowbreak{}lsn)} ordenado por \texttt{(epoch, lsn)}). Las entradas de un epoch perdedor quedan por debajo de las del ganador y son sobrescritas/ignoradas por el orden global. Tras una promoción se reajustan las \textbf{secuencias de id} (\texttt{users/\allowbreak{}posts/\allowbreak{}follows}) a \texttt{MAX(id)} para no colisionar con filas ya replicadas.
+
+\subsection{Fuera de alcance (decisión consciente)}
+
+No se implementan \textbf{ack de quórum en la escritura}, \textbf{commit distribuido} ni \textbf{replicated state machine}. Consecuencia: una escritura confirmada por el leader pero aún no propagada podría perderse si el leader cae en esa ventana. Se acepta por el modelo de consistencia eventual declarado; la rúbrica §5 (no pérdida de los datos \emph{replicados}) se satisface porque la verificación se hace tras la propagación.
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.7 Tolerancia a fallos}
+
+\textbf{Nivel de tolerancia objetivo}: fallos \emph{fail-stop} (caída de proceso/nodo), \textbf{no bizantinos}. Con un PC de \texttt{N} nodos el sistema tolera la pérdida de \textbf{\texttt{N−1}} nodos sin perder los datos ya replicados: mientras sobreviva un nodo con el WAL al día, hay disponibilidad de lectura y, tras la reelección, de escritura. La prueba §5 ejercita el caso extremo (de 3 nodos quedan 0 originales) reincorporando un nodo nuevo antes de la última caída. No se persigue tolerancia bizantina ni alta disponibilidad multi-PC con \emph{failover} automático entre PCs (queda como extensión).
+
+\begin{itemize}
+\item \textbf{Detección}: latidos periódicos + \texttt{FailureDetector} con timeout; al expirar, marca al líder caído (\texttt{mark\_\allowbreak{}peer\_\allowbreak{}down}: \texttt{alive=False}, \texttt{role→follower}) y dispara reelección.
+\item \textbf{Reelección}: Bully en la capa correspondiente; el nuevo leader sube el \texttt{epoch} (fencing del anterior).
+\item \textbf{Estado \texttt{alive} consistente}: \texttt{mark\_\allowbreak{}peer\_\allowbreak{}down} es el punto único de baja; \texttt{Craft\_\allowbreak{}Node} preserva el \texttt{alive} real, de modo que un \textbf{nodo nuevo hereda} qué pares están caídos y no malgasta llamadas. Todas las llamadas a vecinos están protegidas (try/except + timeout): un follower caído nunca aborta una escritura ya confirmada.
+\item \textbf{Join protocol / reingreso}: el nodo nuevo descubre la topología, se registra (\texttt{/\allowbreak{}newNode}), sincroniza el WAL (\texttt{/\allowbreak{}sync}) y queda como follower; al caer el resto, es elegido leader.
+\item \textbf{Anti-entropía}: cada follower ejecuta \texttt{/\allowbreak{}sync} periódico, recuperando WAL perdido (idempotente por \texttt{(epoch, lsn)}).
+\end{itemize}
+
+\textbf{Evidencia (prueba §5, \texttt{make test})}: escenario 3↑ → 2↓ (incluido el leader) → 1 nuevo ↑ → 1↓. Resultado \textbf{\texttt{PRUEBA §5 SUPERADA} (PASS=13, FAIL=0)}: checksums idénticos en los 3 nodos iniciales, dos reelecciones con incremento de epoch (1→2→3), nodo nuevo sincronizado al estado completo y \textbf{sin pérdida de datos} tras los dos failovers. Logs y checksums en \texttt{pruebas/\allowbreak{}evidence/\allowbreak{}}.
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{2.8 Seguridad}
+
+\begin{itemize}
+\item \textbf{CA + mTLS} (\texttt{setup\_\allowbreak{}Security.\allowbreak{}py}, \texttt{CertManager}): identidad por certificado para todo nodo; el canal entre nodos exige certificado de cliente (\texttt{CERT\_\allowbreak{}REQUIRED}) → solo el cluster habla con el cluster.
+\item \textbf{JWT} (\texttt{api\_\allowbreak{}gateway}): autenticación de usuarios de la red social; rutas \texttt{/\allowbreak{}auth} y \texttt{/\allowbreak{}cluster} públicas, el resto exige token válido.
+\item \textbf{bcrypt}: las contraseñas se almacenan hasheadas (el gateway hashea antes de enviarlas al cluster).
+\item \textbf{Mínimo privilegio / aislamiento}: \texttt{cluster\_\allowbreak{}net} es \texttt{internal} (sin host ni internet); solo el frontend y el gateway exponen puertos (\texttt{edge\_\allowbreak{}net}). El canal interno de registro del subleader (\texttt{/\allowbreak{}cluster/\allowbreak{}subleader}) vive en la red aislada.
+\item \textbf{Gestión y rotación de credenciales}: los certificados mTLS los emite la CA del proyecto (\texttt{setup\_\allowbreak{}Security.\allowbreak{}py}) y se montan por nodo en \textbf{solo-lectura}; la \textbf{rotación} se realiza regenerando el kit (nueva CA/certs) y reconstruyendo (\texttt{make certs} tras borrar \texttt{deploy\_\allowbreak{}certs/\allowbreak{}}, luego \texttt{make up}). El \textbf{secreto JWT} (\texttt{JWT\_\allowbreak{}SECRET\_\allowbreak{}KEY}) es una variable de entorno del gateway, rotable por despliegue; las contraseñas nunca se guardan en claro (solo su hash bcrypt). \emph{Fuera de alcance}: rotación automática/sin reinicio y un gestor de secretos externo (Vault, etc.).
+\end{itemize}
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\section{Ejecución del Proyecto}
+
+\textbf{Prerrequisitos}: Docker + Docker Compose v2 y \texttt{make}.
+
+\begin{lstlisting}
+git clone <repo> && cd SocialNetwork
+make up            # certs (auto) + build + 3 nodos + gateway + frontend (UN comando)
+make health        # verificar salud; converge a 1 leader + 2 followers (~10 s)
+# Frontend: http://localhost:8080   ·   API: https://localhost:7000
+make test          # prueba obligatoria de tolerancia §5 (genera pruebas/evidence/)
+make down          # estado limpio
+\end{lstlisting}
+
+Comandos de demo de fallos: \texttt{make add-node} (nodo nuevo), \texttt{make kill-node N=}, \texttt{make start-node N=}, \texttt{make logs}. Video de demostración: ver \href{video\_link.txt}{\texttt{video\_\allowbreak{}link.\allowbreak{}txt}}.
+
+\vspace{2pt}\noindent\rule{\textwidth}{0.4pt}\vspace{2pt}
+
+\subsection{Mapa de código (referencia rápida)}
+
+\begin{center}\footnotesize
+\begin{tabular}{|>{\raggedright\arraybackslash}p{0.46\textwidth}|>{\raggedright\arraybackslash}p{0.46\textwidth}|}
+\hline
+\textbf{Tema} & \textbf{Dónde} \\ \hline
+Estado, elección, replicación, fencing & \texttt{backend/\allowbreak{}Nodes/\allowbreak{}cluster.\allowbreak{}py} \\ \hline
+Subleader / leader global / relay cross-PC & \texttt{backend/\allowbreak{}Nodes/\allowbreak{}Subleader\_\allowbreak{}manager.\allowbreak{}py} \\ \hline
+Heartbeats / detección de fallos / anti-entropía & \texttt{HeartbeatSender.\allowbreak{}py}, \texttt{Failure\_\allowbreak{}Detector.\allowbreak{}py} \\ \hline
+Endpoints de control y datos & \texttt{backend/\allowbreak{}Nodes/\allowbreak{}routes/\allowbreak{}} \\ \hline
+WAL y persistencia & \texttt{models/\allowbreak{}wal.\allowbreak{}py}, \texttt{DataBase.\allowbreak{}py} \\ \hline
+API Gateway (push subleader, JWT) & \texttt{backend/\allowbreak{}services/\allowbreak{}} \\ \hline
+Seguridad (CA, mTLS) & \texttt{backend/\allowbreak{}security/\allowbreak{}} \\ \hline
+Despliegue (2 redes, 1 comando) & \texttt{docker-compose.\allowbreak{}cluster.\allowbreak{}yml}, \texttt{Makefile} \\ \hline
+Prueba §5 + evidencia & \texttt{pruebas/\allowbreak{}test\_\allowbreak{}tolerancia.\allowbreak{}sh}, \texttt{pruebas/\allowbreak{}evidence/\allowbreak{}} \\ \hline
+\end{tabular}
+\end{center}
+
+\end{document}

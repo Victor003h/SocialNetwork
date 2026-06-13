@@ -1,187 +1,95 @@
-# 🧠 Distributed DB Cluster + Auth Service (Manual, Docker-based)
+# 🧠 Red Social sobre Cluster de Base de Datos Distribuido
 
-Este proyecto implementa un **cluster de base de datos distribuido** con:
+Red social desplegada sobre un **cluster de base de datos distribuido jerárquico**, tolerante a
+fallos, con replicación por **Write-Ahead Log (WAL) lógico**, elección de líder **Bully de dos
+niveles**, comunicación segura **mTLS** y despliegue reproducible de **un comando** sobre **dos
+redes Docker**.
 
-- Elección de líder (Bully)
-- Heartbeats y detección de fallos
-- Replicación manual mediante **Write-Ahead Log (WAL lógico)**
-- Sincronización inicial de followers
-- Servicios (`auth`, `user`, `post`) desacoplados del cluster DB
-
-Actualmente el foco está en:
-✅ Cluster DB  
-✅ Integración con Auth  
-❌ Replicación entre servicios (fase futura)
+> Informe técnico completo: [`informe_final.md`](informe_final.md). Video: [`video_link.txt`](video_link.txt).
 
 ---
 
-## 📁 Estructura del proyecto (simplificada)
+## Arquitectura (resumen)
+
+```
+ navegador ──HTTPS──▶ frontend ──┐
+                                 ├─ edge_net (expuesta: 8080 web, 7000 api)
+            api_gateway ◀────────┘
+                 │  mTLS
+                 ▼
+   ┌─────────── cluster_net (interna, AISLADA) ───────────┐
+   │  node1 ── node2 ── node3   (subleader → leader global)│
+   │   │db1     │db2     │db3                              │
+   └──────────────────────────────────────────────────────┘
+```
+
+- **Roles**: cada nodo es `follower`, `subleader` (líder de su PC) o `leader` (líder global entre
+  subleaders). En un despliegue de un PC, el subleader es además el leader global.
+- **Escrituras**: single-writer en el leader; se propagan por WAL `(epoch, lsn)` a los followers
+  (y, en multi-PC, a los demás subleaders). Modelo de **consistencia eventual** con prevención de
+  split-brain por **epoch + quórum**.
+- **El api_gateway** dirige todo al **subleader** de su grupo, que sirve lecturas y reenvía
+  escrituras al leader. El subleader vigente se anuncia al gateway (push) en cada (re)elección.
 
 ---
 
-## 1️⃣ Crear la red Docker (OBLIGATORIO)
+## Requisitos
 
-Todos los contenedores **deben** estar en la misma red.
+- Docker + Docker Compose v2 (`docker compose`).
+- `make`.
+
+No hace falta nada más: los certificados mTLS se generan automáticamente la primera vez.
+
+---
+
+## Ejecución (un comando)
 
 ```bash
-docker network create --driver overlay --attachable  cluster_net
-
+make up        # genera certs si faltan, construye imágenes y levanta 3 nodos + gateway + web
+make health    # estado de los contenedores
 ```
 
-## 2 Levantar los nodos de base de datos Postgres
+- Frontend:  http://localhost:8080
+- API Gateway:  https://localhost:7000  *(certificado self-signed)*
 
-Uno por cada nodo levantado
-Cambiar --name :db2-postgress ,...
+> Nota: el cluster tarda ~10 s en converger a **1 leader + 2 followers** tras `make up`.
+
+### Otros comandos
 
 ```bash
-docker run  -d \
-            --name db1-postgres \
-            --network cluster_net \
-            -e POSTGRES_USER=admin \
-            -e POSTGRES_PASSWORD=secret \
-            -e POSTGRES_DB=cluster_db \
-            -v db1_data:/var/lib/postgresql/data \
-            postgres:14
-
-
+make add-node          # levanta el "nodo nuevo" (node4) para la prueba §5
+make kill-node N=2     # apaga abruptamente un nodo (docker kill)
+make start-node N=2    # vuelve a levantar un nodo
+make logs              # logs en vivo
+make down              # derriba todo y borra volúmenes (estado limpio)
 ```
 
+---
+
+## Prueba obligatoria de tolerancia (§5)
+
+Ejecuta el escenario **3 nodos ↑ → apagar 2 (incluido el leader) → 1 nodo nuevo ↑ → apagar el
+último original**, con verificación por **checksums de Postgres**, roles/epoch vía `/info` y logs
+de reelección:
+
 ```bash
-docker run  -d \
-            --name db2-postgres \
-            --network cluster_net \
-            -e POSTGRES_USER=admin \
-            -e POSTGRES_PASSWORD=secret \
-            -e POSTGRES_DB=cluster_db \
-            -v db2_data:/var/lib/postgresql/data \
-            postgres:14
-
-
+make test
 ```
 
-```bash
-docker run  -d \
-            --name db3-postgres \
-            --network cluster_net \
-            -e POSTGRES_USER=admin \
-            -e POSTGRES_PASSWORD=secret \
-            -e POSTGRES_DB=cluster_db \
-            -v db3_data:/var/lib/postgresql/data \
-            postgres:14
+Genera evidencia en [`pruebas/evidence/`](pruebas/evidence/) (reelección, sync del nodo nuevo,
+checksums, resumen). Resultado esperado: `✅ PRUEBA §5 SUPERADA` (`FAIL=0`).
 
+---
+
+## Estructura
 
 ```
-
-## 3️⃣ Build de la imagen del nodo de cluster DB
-
-Desde Backend/Node
-
-```bash
-docker build -f ./Nodes/Dockerfile.version1 -t  db_cluster_node .
-
-```
-
-## 4️⃣ Levantar los nodos del cluster DB (control + lógica)
-
-A cada nodo le correspode un POSTGRES_HOST y el id de la pc debe ser unico para cada
-nuevo ordenador
-
-Node 1:
-
-```bash
-docker run  -d \
-            --name node1 \
-            --hostname node1.cluster_net\
-            --network cluster_net \
-            --network-alias cluster_net_serv \
-            -v "$(pwd)/deploy_certs/node_1:/app/certs" \
-            -e NODE_ID=1 \
-            -e NODE_PORT=5000 \
-            -e POSTGRES_HOST=db1-postgres \
-            -e NODE_PC_ID=1 \
-            -e SERVICE_NAME=cl_service   db_cluster_node
-
-```
-
-Node 2:
-
-```bash
-docker run   -d  \
-            --name node2 \
-            --hostname node2.cluster_net \
-            --network cluster_net  \
-            --network-alias cluster_net_serv \
-            -v "$(pwd)/deploy_certs/node_2:/app/certs" \
-            -e NODE_ID=2 \
-            -e NODE_PORT=5000 \
-            -e POSTGRES_HOST=db2-postgres \
-            -e NODE_PC_ID=1 \
-            -e SERVICE_NAME=cl_service   db_cluster_node
-
-
-```
-
-Node 3:
-
-```bash
-docker run   -d  \
-            --name node3 \
-            --hostname node3.cluster_net \
-            --network cluster_net  \
-            --network-alias cluster_net_serv \
-            -v "$(pwd)/deploy_certs/node_3:/app/certs" \
-            -e NODE_ID=3 \
-            -e NODE_PORT=5000 \
-            -e POSTGRES_HOST=db3-postgres \
-            -e NODE_PC_ID=1 \
-            -e SERVICE_NAME=cl_service   db_cluster_node
-
-```
-
-## 5️⃣ Verificar estado del cluster
-
-```bash
-docker logs -f node1
-docker logs -f node2
-docker logs -f node3
-
-
-```
-
-## 6 Levantar servicios de api
-
-En backend/services/api_services
-
-```bash
-docker build -f ./services/Dockerfile -t api_services .
-
-```
-
-```bash
-docker run  -d  \
-            --name api_services \
-            --hostname node4.cluster_net \
-            --network cluster_net \
-            -v "$(pwd)/deploy_certs/node_4:/app/certs" \
-            -p 7000:7000  \
-            -e JWT_SECRET_KEY=supersecretkey   api_services
-
-```
-
-## 7 Levantar frontend
-
-en Frontend/
-
-```bash
-
-docker build -f ./Dockerfile -t web_app .
-
-```
-
-```bash
-
-docker run  -d \
-            --network cluster_net \
-            --name social_network  \
-            -p 1000:80 web_app
+backend/Nodes/        # nodo del cluster (estado + control): cluster, WAL, heartbeats, elección
+backend/services/     # api_gateway (stateless) que encapsula los endpoints para el frontend
+backend/security/     # CA + certificados mTLS (setup_Security.py, CertManager)
+Frontend/             # web app
+docker-compose.cluster.yml   # 2 redes, 3 nodos + Postgres, gateway, frontend
+Makefile              # orquestación de un comando
+pruebas/              # test_tolerancia.sh (§5) + evidencia
+informe_final.md      # informe técnico de 8 secciones
 ```

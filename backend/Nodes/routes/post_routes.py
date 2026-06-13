@@ -10,21 +10,24 @@ post_bp = Blueprint("post_bp", __name__)
 
 def Call_leader(cluster,url,method):
 
-
-    leader=cluster.subleader_manager.global_leader               
+    leader = cluster.subleader_manager.get_global_leader()
+    if leader is None:
+        return jsonify({"error": "global leader unavailable"}), 503
     node_data = {
         "ip": leader.ip,
         "hostname": leader.host,
         "port": cluster.local_node.port,
-    } 
+    }
     return cluster.utils.Remote_Comunicate(method, url, node_data, cluster.secure_args,json= request.json)
 
 def Save_Wallog(cluster, WALLog,operation, post,session):
     lsn = cluster.next_lsn()
+    epoch = cluster.current_epoch
     wal=WALLog(
-    wal_id=f"{cluster.local_node.node_id}:{lsn}",
+    wal_id=f"{cluster.local_node.node_id}:{epoch}:{lsn}",
     node_id=cluster.local_node.node_id,
     lsn=lsn,
+    epoch=epoch,
     operation=operation,
     table_name="posts",
     entity_id=str(post.id),

@@ -30,6 +30,21 @@ class utils:
         node_ip=node_data.get("ip")
         Node_hostname=node_data.get("hostname")
         port=node_data.get("port", 5000)
+
+        # La IP cacheada (peer.ip) se vuelve OBSOLETA cuando Docker reasigna direcciones
+        # tras `docker kill` + alta de un nodo nuevo (reuso de IP). Si pinamos el hostname
+        # esperado (nodeN.cluster_net) contra una IP que ahora pertenece a OTRO nodo, el
+        # cert no valida (Hostname mismatch) y aborta la (re)elección. Re-resolvemos la IP
+        # actual desde el hostname del certificado para que IP contactada y hostname fijado
+        # correspondan SIEMPRE al mismo nodo. Un nodo caído no resuelve -> se omite limpio
+        # (en vez de pinchar por error el cert del nodo que heredó su IP).
+        if Node_hostname:
+            try:
+                node_ip = socket.gethostbyname(Node_hostname)
+            except socket.gaierror:
+                print(f"❌ {Node_hostname} no resuelve (nodo caído); se omite.")
+                return None
+
         session = requests.Session()
 
         # 1. Configuramos el adaptador con el nombre que ESPERAMOS ver en el certificado
@@ -41,7 +56,11 @@ class utils:
         # 3. Construimos la URL usando la IP REAL, no el hostname
         url = f"https://{node_ip}:{port}/{endpoint}"
         request_kwargs = { **secure_args, **kwargs }
-        
+        # timeout acotado: sin él, anunciar/heartbeat a un nodo MUERTO (IP liberada
+        # tras docker kill) cuelga el hilo hasta el timeout TCP del SO (minutos),
+        # bloqueando la reelección. Con timeout, falla rápido y el flujo continúa.
+        request_kwargs.setdefault("timeout", 3)
+
         try:
             # 4. Hacemos la petición. 
             # El adaptador se encargará de inyectar el 'hostname_lider' en la validación TLS
@@ -86,7 +105,7 @@ class utils:
             if role=="subleader" or role=="leader":
                 subleader_id=peer_node.node_id
                 local_node.role="follower"
-                last_heartbeat=time.time()
+                last_heartbeat={"id": peer_node.node_id, "timestamp": time.time()}
             
             peers= data.get("peers",{})
             peers = [utils.Craft_Node(v) for v in peers]
@@ -137,7 +156,7 @@ class utils:
             if role=="subleader":
                 subleader_id=node["node_id"]
                 local_node.role="follower"
-                last_heartbeat=time.time()
+                last_heartbeat={"id": subleader_id, "timestamp": time.time()}
             
 
             peer = Node(
@@ -173,7 +192,10 @@ class utils:
         node.host = node_data.get("host")
         node.address = node_data.get("address")
         node.role = node_data.get("role")
-        
+        # Preservar el estado de vida real: un nodo nuevo hereda así qué peers están
+        # caídos y no malgasta llamadas a nodos muertos (to_dict exporta 'alive').
+        node.alive = node_data.get("alive", True)
+
         return node
         
      

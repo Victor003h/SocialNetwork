@@ -52,7 +52,7 @@ const AuthPage: React.FC<{ onAuthChange: () => void }> = ({ onAuthChange }) => {
   };
 
   return (
-    <div className="container d-flex flex-col justify-content-center align-items-center min-vh-100 bg-light">
+    <div className="container d-flex flex-column justify-content-center align-items-center min-vh-100 bg-light">
       {/* --- Header decorativo --- */}
       <div className="text-center mb-4">
         <h1 className="h3 mb-3 fw-normal">Auth Gateway</h1>

@@ -1,0 +1,9 @@
+Enlace al video de demostración del proyecto (subir a minube.uh.cu y pegar aquí):
+
+URL: <<< PEGAR AQUÍ LA URL DE minube.uh.cu >>>
+
+El video debe mostrar:
+- make up -> convergencia a 1 leader + 2 followers (make health / logs).
+- Uso de la red social vía frontend (http://localhost:8080): registro, login, crear posts.
+- make test -> ejecución del escenario obligatorio §5 con resultado "PRUEBA §5 SUPERADA".
+- Comentario de la evidencia (checksums idénticos, reelección, nodo nuevo sincronizado).

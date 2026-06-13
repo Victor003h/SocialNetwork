@@ -5,10 +5,23 @@ import { useState } from "react";
 
 export const App: React.FC = () => {
   const [isAuth, setisAuth] = useState<boolean>(authService.isAuthenticated());
+
   const handleAuthChange = () => {
     setisAuth(true);
   };
+
+  const handleLogout = () => {
+    authService.logout();
+    setisAuth(false);
+  };
+
   return (
-    <>{isAuth ? <MainPage /> : <AuthPage onAuthChange={handleAuthChange} />}</>
+    <>
+      {isAuth ? (
+        <MainPage onLogout={handleLogout} />
+      ) : (
+        <AuthPage onAuthChange={handleAuthChange} />
+      )}
+    </>
   );
 };

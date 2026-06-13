@@ -2,7 +2,7 @@ import threading
 import time
 
 from flask import  jsonify, Blueprint, request,current_app
-from sqlalchemy import select
+from sqlalchemy import false, select, or_, and_
 
 
 
@@ -34,6 +34,8 @@ def election_request():
     print("[ELECTION] election request received")
     # responder INMEDIATO
     response = {"status": "ok"}
+    
+    data = request.get_json()
     # iniciar elección en background
     if cluster.local_node.is_subleader():
         peers = cluster.subleader_manager.subleader_list
@@ -97,8 +99,16 @@ def subleader_announcement():
 def heartbeat():
     
     cluster= current_app.config["cluster"]
+    data=request.get_json()
+    if not data: return {},400
     
-    cluster.last_heartbeat = time.time()
+    # Fencing: un heartbeat de un emisor con epoch inferior viene de un líder
+    # obsoleto; se ignora para que el detector de fallos dispare reelección.
+    msg_epoch = data.get("epoch", 0)
+    if msg_epoch < cluster.current_epoch:
+        return {"status": "stale", "epoch": cluster.current_epoch}, 409
+    cluster.adopt_higher_epoch(msg_epoch, data["id"])
+    cluster.last_heartbeat = {"id": data["id"], "timestamp": time.time()}
     print("[HEARTBEAT] Received from subleader")
     print(f"[HEARTBEAT] Last heartbeat {cluster.last_heartbeat}")
     return {"status": "ok"}
@@ -107,8 +117,17 @@ def heartbeat():
 def heartbeat_leader():
     
     cluster= current_app.config["cluster"]
+    data=request.get_json()
+    if not data: return {},400
     
-    cluster.last_heartbeat_leader = time.time()
+    # Fencing del nivel global: si llega un heartbeat de un leader con epoch
+    # inferior al nuestro, está obsoleto -> se ignora. Si es superior, lo adoptamos
+    # (y cedemos el liderazgo si nos creíamos leader).
+    msg_epoch = data.get("epoch", 0)
+    if msg_epoch < cluster.current_epoch:
+        return {"status": "stale", "epoch": cluster.current_epoch}, 409
+    cluster.adopt_higher_epoch(msg_epoch, data["id"])
+    cluster.last_heartbeat_leader = {"id": data["id"], "timestamp": time.time()}
     print("[HEARTBEAT] Received from leader")
     print(f"[HEARTBEAT] Last heartbeat {cluster.last_heartbeat_leader}")
     return {"status": "ok"}
@@ -152,17 +171,18 @@ def replicate():
     if not msg: return {},400
     
     
-    lsn = msg["lsn"] 
-    # Idempotencia
-    if lsn <= cluster.last_applied_lsn:
+    epoch = msg.get("epoch", 0)
+    lsn = msg["lsn"]
+    # Idempotencia + fencing: solo se aplica si (epoch, lsn) supera al watermark.
+    if not cluster.is_newer(epoch, lsn):
         return {"status": "ignored"}, 200
     session = cluster.database.get_session()
     try:
-        wal = WALLog(**msg) 
+        wal = WALLog(**msg)
         session.add(wal)
         cluster.apply_operation(msg)
         session.commit()
-        cluster.last_applied_lsn = lsn
+        cluster.advance_watermark(epoch, lsn)
         if cluster.local_node.role == "subleader":
             cluster.replicate_to_followers(wal)
         return {"status": "ok"}, 200
@@ -180,20 +200,41 @@ def sync():
     cluster= current_app.config["cluster"]
     WALLog = current_app.config["WALLog"]
     
-    req = request.json
+    req = request.get_json()
     if not req: return {},400
     
-    from_lsn = req["last_lsn"] 
+    from_epoch = req.get("last_epoch", 0)
+    from_lsn = req["last_lsn"]
     session= cluster.database.get_session()
-    
+
     try:
+        # Devuelve todo WAL estrictamente posterior a (from_epoch, from_lsn),
+        # ordenado por la clave global (epoch, lsn) para replay determinista.
         stmt = (
             select(WALLog)
-            .where(WALLog.lsn > from_lsn)
-            .order_by(WALLog.lsn)
-            
+            .where(
+                or_(
+                    WALLog.epoch > from_epoch,
+                    and_(WALLog.epoch == from_epoch, WALLog.lsn > from_lsn),
+                )
+            )
+            .order_by(WALLog.epoch, WALLog.lsn)
         )
         logs = session.execute(stmt).scalars().all()
         return jsonify([log.to_dict() for log in logs]), 200
     finally:
-        session.close()    
+        session.close()  
+          
+@node_bp.route("/PeerDown", methods=["POST"])
+def Mark_Peer_Down():
+    
+    cluster= current_app.config["cluster"]
+
+    data= request.get_json()
+
+    peer = cluster.peers.get(data.get("failure_id"))
+    if peer:
+        # Estado uniforme con el resto del sistema: alive=False y rol->follower.
+        cluster.mark_peer_down(peer, cluster.local_node.role)
+
+    return {"status": "ok"}, 200

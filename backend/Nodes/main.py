@@ -1,3 +1,7 @@
+import os
+import time
+import threading
+
 from flask import Flask
 
 from Failure_Detector import FailureDetector
@@ -58,10 +62,20 @@ def main():
     print("[INIT] ClusterContext initialized")
 
     # -------------------------
-    # 3. Descubrimiento inicial de nodos
+    # 3. Descubrimiento inicial de nodos (con reintentos)
     # -------------------------
+    # Arranques simultáneos: si descubrimos antes de que los hermanos se hayan
+    # registrado en DNS, peers queda vacío y el nodo se auto-promueve a subleader
+    # (multi-líder transitorio). Reintentar da tiempo a que el cluster converja:
+    # basta con que un peer sea visible para no auto-promoverse a ciegas.
     print("[DISCOVERY] Discovering peers...")
-    cluster.discover_peers()
+    discovery_retries = int(os.getenv("DISCOVERY_RETRIES", "5"))
+    for attempt in range(discovery_retries):
+        cluster.discover_peers()
+        if len(cluster.peers) > 0:
+            break
+        print(f"[DISCOVERY] intento {attempt + 1}/{discovery_retries}: sin peers todavía, reintentando...")
+        time.sleep(2)
 
     print(f"[DISCOVERY] Peers found: {len(cluster.peers)}")
     for peer in cluster.get_peers():
@@ -94,12 +108,10 @@ def main():
 
 
     if(cluster.local_node.is_subleader()):
-        heartbead=HeartbeatSender(cluster)
-        heartbead.start()
+        cluster.heartbeadSender.start()
         cluster.subleader_manager.become_subleader()
     else:
-        failure_detector=FailureDetector(cluster)
-        failure_detector.start()
+        cluster.faliuredetector.start()
 
     
     # -------------------------
@@ -111,7 +123,20 @@ def main():
     print(f"[START] Control server running on port {port}")
 
     ssl_context = cluster.security.get_mtls_context()
-    
+
+    # Reconciliación de liderazgo post-bootstrap (Bully determinista). En un hilo
+    # daemon que espera a que los servidores /info de los hermanos estén arriba y
+    # luego colapsa cualquier multi-líder transitorio del arranque a un único
+    # subleader (el de mayor node_id). Ver ClusterContext.ensure_single_leader.
+    def _bootstrap_reconcile():
+        time.sleep(int(os.getenv("BOOTSTRAP_DELAY", "5")))
+        try:
+            cluster.ensure_single_leader()
+        except Exception as e:
+            print(f"[BOOTSTRAP] reconciliación de liderazgo falló: {e}")
+
+    threading.Thread(target=_bootstrap_reconcile, daemon=True).start()
+
     app.run(host="0.0.0.0", port=port,ssl_context=ssl_context)
 
 

@@ -1,0 +1,211 @@
+# =============================================================================
+# Cluster DB distribuido + API Gateway + Frontend
+# Despliegue reproducible de un comando (rúbrica §3) sobre DOS redes Docker.
+#
+#   make up           -> certs (si faltan) + build + levanta 3 nodos + gateway + web
+#   make add-node     -> levanta el "nodo nuevo" (node4) de la prueba §5
+#   make down         -> derriba todo
+#
+# Topología de red:
+#   - cluster_net (interna, aislada): nodos del cluster + sus Postgres + gateway(leg)
+#   - edge_net   (expuesta): gateway (7000) + frontend (8080) -> únicos puertos al host
+#
+# IMPORTANTE: la red se llama EXACTLY 'cluster_net' y los contenedores 'nodeN'
+# para que el PTR de DNS de Docker resuelva a 'nodeN.cluster_net', que es el SAN
+# de los certificados mTLS (ver backend/security/setup_Security.py).
+# =============================================================================
+
+x-pg-env: &pg-env
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: secret
+  POSTGRES_DB: cluster_db
+
+x-pg-healthcheck: &pg-healthcheck
+  test: ["CMD-SHELL", "pg_isready -U admin -d cluster_db"]
+  interval: 5s
+  timeout: 3s
+  retries: 12
+
+# Plantilla base de un nodo del cluster.
+x-node: &node
+  build:
+    context: ./backend
+    dockerfile: ./Nodes/Dockerfile.version1
+  image: db_cluster_node:latest
+  restart: unless-stopped
+  # El servidor del nodo exige certificado de cliente (mTLS, CERT_REQUIRED), por eso
+  # el healthcheck presenta el propio cert del nodo y valida al servidor contra la CA.
+  healthcheck:
+    test: ["CMD", "python", "-c", "import ssl,urllib.request as u; c=ssl.create_default_context(cafile='/app/certs/ca.crt'); c.load_cert_chain('/app/certs/node.crt','/app/certs/node.key'); u.urlopen('https://localhost:5000/health',context=c,timeout=3)"]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 25s
+
+x-node-env: &node-env
+  NODE_PORT: 5000
+  NODE_PC_ID: 1            # despliegue de un solo PC -> quórum trivial (EXPECTED_PCS=1)
+  EXPECTED_PCS: 1
+  SERVICE_NAME: cl_service
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: secret
+  POSTGRES_NAME: cluster_db
+  # Coordenadas del api_gateway para el push subleader->api (notify_gateway):
+  API_GATEWAY_SERVICE: api_services     # nombre DNS de Docker -> IP del gateway
+  API_GATEWAY_HOST: node9.cluster_net   # SAN del cert de api (pin mTLS)
+  API_GATEWAY_PORT: 7000
+
+services:
+  # --------------------------- Postgres (uno por nodo) ----------------------
+  db1:
+    image: postgres:14
+    container_name: db1
+    environment: *pg-env
+    volumes: ["db1_data:/var/lib/postgresql/data"]
+    networks: [cluster_net]
+    healthcheck: *pg-healthcheck
+
+  db2:
+    image: postgres:14
+    container_name: db2
+    environment: *pg-env
+    volumes: ["db2_data:/var/lib/postgresql/data"]
+    networks: [cluster_net]
+    healthcheck: *pg-healthcheck
+
+  db3:
+    image: postgres:14
+    container_name: db3
+    environment: *pg-env
+    volumes: ["db3_data:/var/lib/postgresql/data"]
+    networks: [cluster_net]
+    healthcheck: *pg-healthcheck
+
+  db4:
+    image: postgres:14
+    container_name: db4
+    environment: *pg-env
+    volumes: ["db4_data:/var/lib/postgresql/data"]
+    networks: [cluster_net]
+    healthcheck: *pg-healthcheck
+
+  # --------------------------- Nodos del cluster ----------------------------
+  node1:
+    <<: *node
+    container_name: node1
+    hostname: node1.cluster_net
+    environment:
+      <<: *node-env
+      NODE_ID: 1
+      POSTGRES_HOST: db1
+    volumes: ["./backend/deploy_certs/node_1:/app/certs:ro"]
+    depends_on:
+      db1: {condition: service_healthy}
+    networks:
+      cluster_net:
+        aliases: [cluster_net_serv]
+
+  node2:
+    <<: *node
+    container_name: node2
+    hostname: node2.cluster_net
+    environment:
+      <<: *node-env
+      NODE_ID: 2
+      POSTGRES_HOST: db2
+    volumes: ["./backend/deploy_certs/node_2:/app/certs:ro"]
+    depends_on:
+      db2: {condition: service_healthy}
+    networks:
+      cluster_net:
+        aliases: [cluster_net_serv]
+
+  node3:
+    <<: *node
+    container_name: node3
+    hostname: node3.cluster_net
+    environment:
+      <<: *node-env
+      NODE_ID: 3
+      POSTGRES_HOST: db3
+    volumes: ["./backend/deploy_certs/node_3:/app/certs:ro"]
+    depends_on:
+      db3: {condition: service_healthy}
+    networks:
+      cluster_net:
+        aliases: [cluster_net_serv]
+
+  # "Nodo nuevo" de la prueba §5: no arranca con `up`, solo con el perfil 'newnode'.
+  node4:
+    <<: *node
+    container_name: node4
+    hostname: node4.cluster_net
+    profiles: ["newnode"]
+    environment:
+      <<: *node-env
+      NODE_ID: 4
+      POSTGRES_HOST: db4
+    volumes: ["./backend/deploy_certs/node_4:/app/certs:ro"]
+    depends_on:
+      db4: {condition: service_healthy}
+    networks:
+      cluster_net:
+        aliases: [cluster_net_serv]
+
+  # --------------------------- API Gateway (stateless) ----------------------
+  api_services:
+    build:
+      context: ./backend
+      dockerfile: ./services/Dockerfile
+    image: api_services:latest
+    container_name: api_services
+    hostname: node9.cluster_net
+    restart: unless-stopped
+    environment:
+      JWT_SECRET_KEY: supersecretkey
+    volumes: ["./backend/deploy_certs/node_9:/app/certs:ro"]
+    ports:
+      - "7000:7000"        # expuesto al host (el navegador llama a https://localhost:7000)
+    depends_on:
+      node1: {condition: service_healthy}
+    networks:
+      # El gateway pertenece a cluster_net para RESOLVER el alias cluster_net_serv
+      # (y alcanzar a los nodos), pero NO comparte el alias: así no aparece como un
+      # falso peer en el descubrimiento DNS de los nodos (get_ips_for_alias).
+      cluster_net: {}
+      edge_net: {}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request as u; c=ssl._create_unverified_context(); u.urlopen('https://localhost:7000/',context=c,timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # --------------------------- Frontend (stateless) -------------------------
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: ./Dockerfile
+    image: web_app:latest
+    container_name: social_network
+    restart: unless-stopped
+    ports:
+      - "8080:80"          # http://localhost:8080
+    depends_on:
+      - api_services
+    networks:
+      edge_net: {}
+
+networks:
+  # Nombre EXACTO 'cluster_net' (requerido por el PTR/SAN de los certificados).
+  cluster_net:
+    name: cluster_net
+    internal: true         # aislada: sin acceso al host ni a internet
+  edge_net:
+    name: edge_net
+
+volumes:
+  db1_data:
+  db2_data:
+  db3_data:
+  db4_data:
